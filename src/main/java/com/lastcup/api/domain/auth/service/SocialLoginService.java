@@ -1,5 +1,6 @@
 package com.lastcup.api.domain.auth.service;
 
+import com.lastcup.api.domain.auth.dto.request.SocialLoginRequest;
 import com.lastcup.api.domain.auth.dto.response.AuthResponse;
 import com.lastcup.api.domain.auth.dto.response.AuthTokensResponse;
 import com.lastcup.api.domain.auth.dto.response.UserSummaryResponse;
@@ -7,6 +8,7 @@ import com.lastcup.api.domain.user.domain.SocialAuth;
 import com.lastcup.api.domain.user.domain.User;
 import com.lastcup.api.domain.user.repository.SocialAuthRepository;
 import com.lastcup.api.domain.user.repository.UserRepository;
+import com.lastcup.api.infrastructure.oauth.KakaoClient;
 import com.lastcup.api.infrastructure.oauth.OAuthTokenVerifier;
 import com.lastcup.api.infrastructure.oauth.SocialProvider;
 import com.lastcup.api.infrastructure.oauth.VerifiedOAuthUser;
@@ -19,6 +21,7 @@ import java.util.List;
 public class SocialLoginService {
 
     private final List<OAuthTokenVerifier> verifiers;
+    private final KakaoClient kakaoClient;
     private final UserRepository userRepository;
     private final SocialAuthRepository socialAuthRepository;
     private final NicknameGenerator nicknameGenerator;
@@ -26,12 +29,14 @@ public class SocialLoginService {
 
     public SocialLoginService(
             List<OAuthTokenVerifier> verifiers,
+            KakaoClient kakaoClient,
             UserRepository userRepository,
             SocialAuthRepository socialAuthRepository,
             NicknameGenerator nicknameGenerator,
             TokenService tokenService
     ) {
         this.verifiers = verifiers;
+        this.kakaoClient = kakaoClient;
         this.userRepository = userRepository;
         this.socialAuthRepository = socialAuthRepository;
         this.nicknameGenerator = nicknameGenerator;
@@ -39,9 +44,32 @@ public class SocialLoginService {
     }
 
     @Transactional
-    public AuthResponse login(SocialProvider provider, String providerAccessToken) {
-        VerifiedOAuthUser verified = findVerifier(provider).verify(providerAccessToken);
+    public AuthResponse login(SocialProvider provider, SocialLoginRequest request) {
+        VerifiedOAuthUser verified = verifyWithProvider(provider, request);
         return loginWithVerified(provider, verified);
+    }
+
+    private VerifiedOAuthUser verifyWithProvider(SocialProvider provider, SocialLoginRequest request) {
+        if (provider == SocialProvider.KAKAO) {
+            return kakaoClient.verifyAuthorizationCode(extractAuthorizationCode(request));
+        }
+        return findVerifier(provider).verify(extractProviderAccessToken(request));
+    }
+
+    private String extractAuthorizationCode(SocialLoginRequest request) {
+        String code = request.authorizationCode();
+        if (code == null || code.isBlank()) {
+            throw new IllegalArgumentException("authorizationCode is required");
+        }
+        return code;
+    }
+
+    private String extractProviderAccessToken(SocialLoginRequest request) {
+        String token = request.providerAccessToken();
+        if (token == null || token.isBlank()) {
+            throw new IllegalArgumentException("providerAccessToken is required");
+        }
+        return token;
     }
 
     private AuthResponse loginWithVerified(SocialProvider provider, VerifiedOAuthUser verified) {

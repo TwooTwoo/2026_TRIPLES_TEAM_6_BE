@@ -6,43 +6,44 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
 @Component
-public class KakaoClient implements OAuthTokenVerifier {
+public class KakaoClient {
 
     private final RestClient restClient;
-    private final String accessTokenInfoUrl;
+    private final String tokenUrl;
     private final String userInfoUrl;
-    private final String expectedAppId;
+    private final String clientId;
+    private final String clientSecret;
+    private final String redirectUri;
 
     public KakaoClient(
-            @Value("${app.oauth.kakao.access-token-info-url:https://kapi.kakao.com/v1/user/access_token_info}") String accessTokenInfoUrl,
+            @Value("${app.oauth.kakao.token-url:https://kauth.kakao.com/oauth/token}") String tokenUrl,
             @Value("${app.oauth.kakao.user-info-url:https://kapi.kakao.com/v2/user/me?secure_resource=true}") String userInfoUrl,
-            @Value("${app.oauth.kakao.app-id:}") String expectedAppId
+            @Value("${app.oauth.kakao.client-id:}") String clientId,
+            @Value("${app.oauth.kakao.client-secret:}") String clientSecret,
+            @Value("${app.oauth.kakao.redirect-uri:}") String redirectUri
     ) {
         this.restClient = RestClient.builder().build();
-        this.accessTokenInfoUrl = accessTokenInfoUrl;
+        this.tokenUrl = tokenUrl;
         this.userInfoUrl = userInfoUrl;
-        this.expectedAppId = expectedAppId;
+        this.clientId = clientId;
+        this.clientSecret = clientSecret;
+        this.redirectUri = redirectUri;
     }
 
-    @Override
-    public SocialProvider getProvider() {
-        return SocialProvider.KAKAO;
-    }
+    public VerifiedOAuthUser verifyAuthorizationCode(String authorizationCode) {
+        validateAuthorizationCode(authorizationCode);
+        validateClientId();
 
-    @Override
-    public VerifiedOAuthUser verify(String providerAccessToken) {
-        validateToken(providerAccessToken);
+        KakaoTokenResponse token = fetchAccessToken(authorizationCode);
+        KakaoUserResponse userInfo = fetchUserInfo(token.accessToken);
 
-        KakaoTokenInfoResponse tokenInfo = fetchTokenInfo(providerAccessToken);
-        validateAppIdIfConfigured(tokenInfo);
-
-        KakaoUserResponse userInfo = fetchUserInfo(providerAccessToken);
-
-        String providerUserKey = toProviderUserKey(tokenInfo);
+        String providerUserKey = extractProviderUserKey(userInfo);
         String email = extractEmail(userInfo);
         String profileImageUrl = extractProfileImageUrl(userInfo);
 
@@ -50,34 +51,54 @@ public class KakaoClient implements OAuthTokenVerifier {
         return new VerifiedOAuthUser(providerUserKey, email, profileImageUrl);
     }
 
-    private void validateToken(String token) {
-        if (token == null || token.isBlank()) {
-            throw new OAuthVerificationException("KAKAO_ACCESS_TOKEN_EMPTY");
+    private void validateAuthorizationCode(String code) {
+        if (code == null || code.isBlank()) {
+            throw new OAuthVerificationException("KAKAO_AUTHORIZATION_CODE_EMPTY");
         }
     }
 
-    private KakaoTokenInfoResponse fetchTokenInfo(String token) {
-        try {
-            KakaoTokenInfoResponse response = restClient.get()
-                    .uri(accessTokenInfoUrl)
-                    .header(HttpHeaders.AUTHORIZATION, bearer(token))
-                    .accept(MediaType.APPLICATION_JSON)
-                    .retrieve()
-                    .body(KakaoTokenInfoResponse.class);
+    private void validateClientId() {
+        if (clientId == null || clientId.isBlank()) {
+            throw new OAuthVerificationException("KAKAO_CLIENT_ID_EMPTY");
+        }
+    }
 
-            if (response != null) {
+    private KakaoTokenResponse fetchAccessToken(String code) {
+        try {
+            KakaoTokenResponse response = restClient.post()
+                    .uri(tokenUrl)
+                    .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                    .body(createTokenRequest(code))
+                    .retrieve()
+                    .body(KakaoTokenResponse.class);
+
+            if (response != null && response.accessToken != null && !response.accessToken.isBlank()) {
                 return response;
             }
         } catch (RestClientException ignored) {
         }
-        throw new OAuthVerificationException("KAKAO_ACCESS_TOKEN_INVALID");
+        throw new OAuthVerificationException("KAKAO_TOKEN_EXCHANGE_FAILED");
     }
 
-    private KakaoUserResponse fetchUserInfo(String token) {
+    private MultiValueMap<String, String> createTokenRequest(String code) {
+        MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
+        form.add("grant_type", "authorization_code");
+        form.add("client_id", clientId);
+        form.add("code", code);
+        if (redirectUri != null && !redirectUri.isBlank()) {
+            form.add("redirect_uri", redirectUri);
+        }
+        if (clientSecret != null && !clientSecret.isBlank()) {
+            form.add("client_secret", clientSecret);
+        }
+        return form;
+    }
+
+    private KakaoUserResponse fetchUserInfo(String accessToken) {
         try {
             KakaoUserResponse response = restClient.get()
                     .uri(userInfoUrl)
-                    .header(HttpHeaders.AUTHORIZATION, bearer(token))
+                    .header(HttpHeaders.AUTHORIZATION, bearer(accessToken))
                     .accept(MediaType.APPLICATION_JSON)
                     .retrieve()
                     .body(KakaoUserResponse.class);
@@ -94,23 +115,11 @@ public class KakaoClient implements OAuthTokenVerifier {
         return "Bearer " + token;
     }
 
-    private void validateAppIdIfConfigured(KakaoTokenInfoResponse tokenInfo) {
-        if (expectedAppId == null || expectedAppId.isBlank()) {
-            return;
-        }
-        if (tokenInfo.appId == null) {
-            throw new OAuthVerificationException("KAKAO_APP_ID_MISSING");
-        }
-        if (!expectedAppId.equals(String.valueOf(tokenInfo.appId))) {
-            throw new OAuthVerificationException("KAKAO_APP_ID_MISMATCH");
-        }
-    }
-
-    private String toProviderUserKey(KakaoTokenInfoResponse tokenInfo) {
-        if (tokenInfo.id == null) {
+    private String extractProviderUserKey(KakaoUserResponse userInfo) {
+        if (userInfo.id == null) {
             throw new OAuthVerificationException("KAKAO_ID_MISSING");
         }
-        return String.valueOf(tokenInfo.id);
+        return String.valueOf(userInfo.id);
     }
 
     private String extractEmail(KakaoUserResponse userInfo) {
@@ -152,12 +161,9 @@ public class KakaoClient implements OAuthTokenVerifier {
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
-    static class KakaoTokenInfoResponse {
-        @JsonProperty("id")
-        public Long id;
-
-        @JsonProperty("app_id")
-        public Long appId;
+    static class KakaoTokenResponse {
+        @JsonProperty("access_token")
+        public String accessToken;
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)

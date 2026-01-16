@@ -58,14 +58,14 @@ public class AuthController {
         return ApiResponse.of(response);
     }
 
-    @Operation(summary = "소셜 로그인", description = "providerAccessToken을 검증하고, 서비스 JWT(access/refresh)를 발급합니다.")
+    @Operation(summary = "소셜 로그인", description = "GOOGLE은 ID Token, KAKAO는 인가 코드를 받아 JWT(access/refresh)를 발급합니다.")
     @PostMapping("/social/{provider}/login")
     @ResponseStatus(HttpStatus.OK)
     public ApiResponse<AuthResponse> socialLogin(
             @PathVariable SocialProvider provider,
             @RequestBody @Valid SocialLoginRequest request
     ) {
-        AuthResponse response = socialLoginService.login(provider, request.providerAccessToken());
+        AuthResponse response = socialLoginService.login(provider, request);
         return ApiResponse.of(response);
     }
 
