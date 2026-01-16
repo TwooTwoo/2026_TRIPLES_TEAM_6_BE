@@ -1,6 +1,6 @@
 ---
 name: Issue Template
-about: 이슈 생성시 사용하는 템플릿입니다.
+about: 신규 기능 개발 요청시 사용하는 이슈 템플릿입니다.
 title: ''
 labels: ''
 assignees: ''
