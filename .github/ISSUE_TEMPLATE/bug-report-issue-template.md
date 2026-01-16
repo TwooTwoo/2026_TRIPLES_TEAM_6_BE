@@ -1,5 +1,5 @@
 ---
-name: Bug Report Template
+name: Bug Report Issue Template
 about: 버그 리포트 생성시 사용하는 이슈 템플릿입니다.
 title: ''
 labels: ''
