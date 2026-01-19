@@ -25,7 +25,11 @@ public class SecurityConfig {
     }
 
     @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain filterChain(
+            HttpSecurity http,
+            ApiAuthenticationEntryPoint authenticationEntryPoint,
+            ApiAccessDeniedHandler accessDeniedHandler
+    ) throws Exception {
         return http
                 .csrf(csrf -> csrf.disable())
                 .cors(Customizer.withDefaults())
@@ -36,8 +40,26 @@ public class SecurityConfig {
                         .requestMatchers("/api-docs/**", "/v3/api-docs/**").permitAll()
                         .anyRequest().authenticated()
                 )
+                .exceptionHandling(handling -> handling
+                        .authenticationEntryPoint(authenticationEntryPoint)
+                        .accessDeniedHandler(accessDeniedHandler)
+                )
                 .addFilterBefore(new JwtAuthenticationFilter(jwtProvider), UsernamePasswordAuthenticationFilter.class)
                 .build();
+    }
+
+    @Bean
+    public ApiAuthenticationEntryPoint apiAuthenticationEntryPoint(
+            com.fasterxml.jackson.databind.ObjectMapper objectMapper
+    ) {
+        return new ApiAuthenticationEntryPoint(objectMapper);
+    }
+
+    @Bean
+    public ApiAccessDeniedHandler apiAccessDeniedHandler(
+            com.fasterxml.jackson.databind.ObjectMapper objectMapper
+    ) {
+        return new ApiAccessDeniedHandler(objectMapper);
     }
 
     /*
