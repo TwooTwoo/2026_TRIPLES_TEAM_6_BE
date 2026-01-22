@@ -28,6 +28,15 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     protected boolean shouldNotFilter(HttpServletRequest request) {
         String uri = request.getRequestURI();
 
+        if (PATH_MATCHER.match("/webjars/**", uri)) {
+            return true;
+        }
+        if (PATH_MATCHER.match("/favicon.ico", uri)) {
+            return true;
+        }
+        if (PATH_MATCHER.match("/actuator/**", uri)) {
+            return true;
+        }
         if (PATH_MATCHER.match("/api/v1/auth/**", uri)) {
             return true;
         }

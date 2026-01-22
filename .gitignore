@@ -26,6 +26,11 @@ out/
 !**/src/main/**/out/
 !**/src/test/**/out/
 
+### build ###
+.idea/
+build/
+.gradle/
+
 ### NetBeans ###
 /nbproject/private/
 /nbbuild/
@@ -35,3 +40,12 @@ out/
 
 ### VS Code ###
 .vscode/
+
+# environment files
+.env
+
+### k8s
+k8s/lastcup/local/
+**/*secret.plain*.yaml
+**/*secret.plain*.yml
+**/*.pem
