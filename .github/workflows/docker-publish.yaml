@@ -9,6 +9,10 @@ permissions:
   contents: write
   packages: write
 
+concurrency:
+  group: deploy-main
+  cancel-in-progress: true
+
 jobs:
   build-and-push:
     if: github.actor != 'github-actions[bot]'
