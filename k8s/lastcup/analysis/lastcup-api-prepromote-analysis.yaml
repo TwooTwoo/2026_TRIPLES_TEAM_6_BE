@@ -11,7 +11,8 @@ spec:
       failureLimit: 2
       provider:
         web:
-          url: "http://lastcup-api-preview/actuator/health"
+          url: "http://lastcup-api-preview.lastcup.svc.cluster.local/actuator/health"
           timeoutSeconds: 5
           jsonPath: "{$.status}"
       successCondition: result == "UP"
+g
