@@ -15,4 +15,3 @@ spec:
           timeoutSeconds: 5
           jsonPath: "{$.status}"
       successCondition: result == "UP"
-g
