@@ -10,8 +10,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional
 public class UserGoalService {
 
-    private static final int DEFAULT_DAILY_CAFFEINE_TARGET = 0;
-    private static final int DEFAULT_DAILY_SUGAR_TARGET = 0;
+    private static final int DEFAULT_DAILY_CAFFEINE_TARGET = 400;
+    private static final int DEFAULT_DAILY_SUGAR_TARGET = 50;
 
     private final UserGoalRepository repository;
 
