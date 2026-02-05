@@ -3,8 +3,10 @@ package com.lastcup.api.domain.goal.service;
 import com.lastcup.api.domain.goal.domain.UserGoal;
 import com.lastcup.api.domain.goal.repository.UserGoalRepository;
 import java.time.LocalDate;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import java.util.Optional;
 
 @Service
 @Transactional
@@ -13,27 +15,26 @@ public class UserGoalService {
     private static final int DEFAULT_DAILY_CAFFEINE_TARGET = 400;
     private static final int DEFAULT_DAILY_SUGAR_TARGET = 25;
 
-    private final UserGoalRepository repository;
+    private final UserGoalRepository userGoalRepository;
 
-    public UserGoalService(UserGoalRepository repository) {
-        this.repository = repository;
+    public UserGoalService(UserGoalRepository userGoalRepository) {
+        this.userGoalRepository = userGoalRepository;
     }
 
     @Transactional(readOnly = true)
     public UserGoal findCurrent(Long userId) {
         LocalDate today = LocalDate.now();
-        return repository.findActiveByDate(userId, today)
+        return findFirstActiveByDate(userId, today)
                 .orElseThrow(() -> new IllegalArgumentException("user goal not found"));
     }
 
-    @Transactional(readOnly = true)
     public UserGoal findByDate(Long userId, LocalDate date) {
         LocalDate targetDate = date != null ? date : LocalDate.now();
         if (targetDate.isEqual(LocalDate.now())) {
-            return repository.findActiveByDate(userId, targetDate)
+            return findFirstActiveByDate(userId, targetDate)
                     .orElseGet(() -> createDefault(userId, targetDate));
         }
-        return repository.findActiveByDate(userId, targetDate)
+        return findFirstActiveByDate(userId, targetDate)
                 .orElseThrow(() -> new IllegalArgumentException("user goal not found"));
     }
 
@@ -48,11 +49,11 @@ public class UserGoalService {
             LocalDate startDate
     ) {
         LocalDate effectiveStartDate = resolveStartDate(startDate);
-        UserGoal current = repository.findTopByUserIdAndEndDateIsNullOrderByStartDateDesc(userId)
+        UserGoal current = userGoalRepository.findTopByUserIdAndEndDateIsNullOrderByStartDateDesc(userId)
                 .orElse(null);
 
         if (current == null) {
-            return repository.save(UserGoal.create(
+            return userGoalRepository.save(UserGoal.create(
                     userId,
                     dailyCaffeineTarget,
                     dailySugarTarget,
@@ -78,7 +79,7 @@ public class UserGoalService {
                 effectiveStartDate,
                 null
         );
-        return repository.save(next);
+        return userGoalRepository.save(next);
     }
 
     private UserGoal createDefault(Long userId, LocalDate startDate) {
@@ -89,7 +90,13 @@ public class UserGoalService {
                 startDate,
                 null
         );
-        return repository.save(created);
+        return userGoalRepository.save(created);
+    }
+
+    private Optional<UserGoal> findFirstActiveByDate(Long userId, LocalDate date) {
+        return userGoalRepository.findActiveByDate(userId, date, PageRequest.of(0, 1))
+                .stream()
+                .findFirst();
     }
 
     private LocalDate resolveStartDate(LocalDate startDate) {
