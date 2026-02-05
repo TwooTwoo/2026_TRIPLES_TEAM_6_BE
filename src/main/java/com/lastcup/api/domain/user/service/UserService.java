@@ -79,6 +79,7 @@ public class UserService {
         return new UserMeResponse(
                 user.getId(),
                 user.getNickname(),
+                user.getEmail(),
                 user.getProfileImageUrl(),
                 user.getStatus(),
                 user.getCreatedAt(),

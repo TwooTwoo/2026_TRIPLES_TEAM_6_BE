@@ -12,6 +12,9 @@ public record UserMeResponse(
         @Schema(description = "닉네임", example = "커피러버")
         String nickname,
 
+        @Schema(description = "이메일", example = "user@example.com")
+        String email,
+
         @Schema(description = "프로필 이미지 URL", example = "https://.../profile.jpg")
         String profileImageUrl,
 

@@ -4,6 +4,7 @@ import org.springframework.http.HttpStatus;
 
 public enum AuthErrorCode implements ErrorCode {
     AUTH_DUPLICATE_LOGIN_ID("AUTH_DUPLICATE_LOGIN_ID", "이미 사용 중인 아이디입니다.", HttpStatus.CONFLICT),
+    AUTH_DUPLICATE_EMAIL("AUTH_DUPLICATE_EMAIL", "이미 사용 중인 이메일입니다.", HttpStatus.CONFLICT),
     AUTH_DUPLICATE_NICKNAME("AUTH_DUPLICATE_NICKNAME", "이미 사용 중인 닉네임입니다.", HttpStatus.CONFLICT),
     AUTH_INVALID_CREDENTIALS("AUTH_INVALID_CREDENTIALS", "아이디 또는 비밀번호가 올바르지 않습니다.", HttpStatus.UNAUTHORIZED),
     AUTH_PROVIDER_INVALID("AUTH_PROVIDER_INVALID", "지원하지 않는 소셜 제공자입니다.", HttpStatus.BAD_REQUEST),

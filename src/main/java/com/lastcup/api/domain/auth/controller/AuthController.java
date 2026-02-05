@@ -1,6 +1,8 @@
 package com.lastcup.api.domain.auth.controller;
 
 import com.lastcup.api.domain.auth.dto.request.LoginRequest;
+import com.lastcup.api.domain.auth.dto.request.PasswordResetConfirmRequest;
+import com.lastcup.api.domain.auth.dto.request.PasswordResetRequest;
 import com.lastcup.api.domain.auth.dto.request.SignupRequest;
 import com.lastcup.api.domain.auth.dto.request.SocialLoginRequest;
 import com.lastcup.api.domain.auth.dto.response.AuthResponse;
@@ -9,6 +11,7 @@ import com.lastcup.api.domain.auth.dto.response.AuthTokensResponse;
 import com.lastcup.api.domain.auth.dto.response.AvailabilityResponse;
 import com.lastcup.api.global.response.ApiResponse;
 import com.lastcup.api.domain.auth.service.AuthService;
+import com.lastcup.api.domain.auth.service.PasswordResetService;
 import com.lastcup.api.domain.auth.service.SocialLoginService;
 import com.lastcup.api.infrastructure.oauth.SocialProvider;
 import io.swagger.v3.oas.annotations.Operation;
@@ -27,10 +30,16 @@ public class AuthController {
 
     private final SocialLoginService socialLoginService;
     private final AuthService authService;
+    private final PasswordResetService passwordResetService;
 
-    public AuthController(SocialLoginService socialLoginService, AuthService authService) {
+    public AuthController(
+            SocialLoginService socialLoginService,
+            AuthService authService,
+            PasswordResetService passwordResetService
+    ) {
         this.socialLoginService = socialLoginService;
         this.authService = authService;
+        this.passwordResetService = passwordResetService;
     }
 
     @Operation(summary = "아이디 중복 확인", description = "loginId 사용 가능 여부를 반환합니다.")
@@ -57,6 +66,7 @@ public class AuthController {
 
     @Operation(summary = "로컬 로그인", description = "아이디/비밀번호를 검증하고 JWT(access/refresh)를 발급합니다.")
     @PostMapping("/login")
+    @ResponseStatus(HttpStatus.OK)
     public ApiResponse<AuthResultResponse> login(@RequestBody @Valid LoginRequest request) {
         AuthResultResponse response = authService.createLogin(request);
         return ApiResponse.success(response);
@@ -80,6 +90,20 @@ public class AuthController {
         String refreshToken = resolveToken(request);
         AuthTokensResponse tokens = authService.refresh(refreshToken);
         return ApiResponse.success(tokens);
+    }
+
+    @Operation(summary = "비밀번호 재설정 링크 요청", description = "이메일로 비밀번호 재설정 링크를 전송합니다.")
+    @PostMapping("/password-reset/request")
+    public ApiResponse<Boolean> requestPasswordReset(@RequestBody @Valid PasswordResetRequest request) {
+        passwordResetService.requestReset(request);
+        return ApiResponse.success(true);
+    }
+
+    @Operation(summary = "비밀번호 재설정", description = "토큰을 검증하고 새 비밀번호로 변경합니다.")
+    @PostMapping("/password-reset/confirm")
+    public ApiResponse<Boolean> confirmPasswordReset(@RequestBody @Valid PasswordResetConfirmRequest request) {
+        passwordResetService.confirmReset(request);
+        return ApiResponse.success(true);
     }
 
     @Operation(summary = "로그아웃", description = "Refresh Token을 검증하고 로그아웃 처리합니다.")

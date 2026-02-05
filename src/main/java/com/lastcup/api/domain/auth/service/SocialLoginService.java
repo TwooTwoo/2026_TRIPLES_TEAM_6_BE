@@ -51,6 +51,8 @@ public class SocialLoginService {
     @Transactional
     public AuthResponse login(SocialProvider provider, SocialLoginRequest request) {
         VerifiedOAuthUser verified = verifyWithProvider(provider, request);
+        String resolvedEmail = resolveEmail(verified.email(), request.email());
+        verified = new VerifiedOAuthUser(verified.providerUserKey(), resolvedEmail, verified.profileImageUrl());
         return loginWithVerified(provider, verified);
     }
 
@@ -99,7 +101,10 @@ public class SocialLoginService {
     }
 
     private AuthResponse signupNewUser(SocialProvider provider, VerifiedOAuthUser verified) {
-        User user = userRepository.save(User.create(createUniqueNickname(), verified.profileImageUrl()));
+        if (userRepository.existsByEmail(verified.email())) {
+            throw new IllegalArgumentException("email already exists");
+        }
+        User user = userRepository.save(User.create(createUniqueNickname(), verified.email(), verified.profileImageUrl()));
         socialAuthRepository.save(SocialAuth.create(
                 user.getId(),
                 provider,
@@ -119,6 +124,16 @@ public class SocialLoginService {
             }
         }
         throw new IllegalStateException("nickname create failed");
+    }
+
+    private String resolveEmail(String verifiedEmail, String requestEmail) {
+        if (verifiedEmail != null && !verifiedEmail.isBlank()) {
+            return verifiedEmail;
+        }
+        if (requestEmail != null && !requestEmail.isBlank()) {
+            return requestEmail;
+        }
+        throw new IllegalArgumentException("email is required");
     }
 
     private OAuthTokenVerifier findVerifier(SocialProvider provider) {
