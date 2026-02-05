@@ -5,7 +5,8 @@ metadata:
   namespace: argocd
   annotations:
     argocd-image-updater.argoproj.io/image-list: lastcup-api=ghcr.io/gdgoc2026-triples-project/2026_triples_team_6_be
-    argocd-image-updater.argoproj.io/lastcup-api.update-strategy: digest
+    argocd-image-updater.argoproj.io/lastcup-api.update-strategy: latest
+    argocd-image-updater.argoproj.io/lastcup-api.allow-tags: regexp:^latest$
     argocd-image-updater.argoproj.io/lastcup-api.pull-secret: pullsecret:argocd/ghcr-cred
     argocd-image-updater.argoproj.io/write-back-method: argocd
 spec:
