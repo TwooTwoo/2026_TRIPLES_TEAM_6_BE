@@ -11,7 +11,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class UserGoalService {
 
     private static final int DEFAULT_DAILY_CAFFEINE_TARGET = 400;
-    private static final int DEFAULT_DAILY_SUGAR_TARGET = 50;
+    private static final int DEFAULT_DAILY_SUGAR_TARGET = 25;
 
     private final UserGoalRepository repository;
 
@@ -22,6 +22,15 @@ public class UserGoalService {
     @Transactional(readOnly = true)
     public UserGoal findCurrent(Long userId) {
         return repository.findTopByUserIdAndEndDateIsNullOrderByStartDateDesc(userId)
+                .orElseThrow(() -> new IllegalArgumentException("user goal not found"));
+    }
+
+    @Transactional(readOnly = true)
+    public UserGoal findByDate(Long userId, LocalDate date) {
+        if (date == null) {
+            return findOrCreateCurrent(userId);
+        }
+        return repository.findActiveByDate(userId, date)
                 .orElseThrow(() -> new IllegalArgumentException("user goal not found"));
     }
 
