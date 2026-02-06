@@ -26,8 +26,8 @@ public class GoogleClient implements OAuthTokenVerifier {
     }
 
     @Override
-    public VerifiedOAuthUser verify(String providerAccessToken) {
-        GoogleIdToken idToken = verifyIdToken(providerAccessToken);
+    public VerifiedOAuthUser verify(String providerToken) {
+        GoogleIdToken idToken = verifyIdToken(providerToken);
         GoogleIdToken.Payload payload = idToken.getPayload();
 
         String providerUserKey = payload.getSubject();
