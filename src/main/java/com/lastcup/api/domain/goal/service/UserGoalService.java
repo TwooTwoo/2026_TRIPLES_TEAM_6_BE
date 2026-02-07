@@ -30,12 +30,8 @@ public class UserGoalService {
 
     public UserGoal findByDate(Long userId, LocalDate date) {
         LocalDate targetDate = date != null ? date : LocalDate.now();
-        if (targetDate.isEqual(LocalDate.now())) {
-            return findFirstActiveByDate(userId, targetDate)
-                    .orElseGet(() -> createDefault(userId, targetDate));
-        }
         return findFirstActiveByDate(userId, targetDate)
-                .orElseThrow(() -> new IllegalArgumentException("user goal not found"));
+                .orElseGet(() -> createDefault(userId, targetDate));
     }
 
     public UserGoal findOrCreateCurrent(Long userId) {
