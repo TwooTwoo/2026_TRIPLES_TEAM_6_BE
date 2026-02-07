@@ -48,6 +48,9 @@ public class KakaoClient implements OAuthTokenVerifier {
                     response.kakaoAccount != null ? response.kakaoAccount.email : null,
                     null
             );
+        } catch (OAuthVerificationException ex) {
+            log.warn("카카오 인증 실패: {}", ex.getMessage());
+            throw ex;
         } catch (Exception e) {
             log.error("카카오 사용자 정보 조회 실패: {}", e.getMessage(), e);
             throw new OAuthVerificationException("KAKAO_USER_INFO_FETCH_FAILED");

@@ -1,5 +1,6 @@
 package com.lastcup.api.security;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.List;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -22,9 +23,11 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 public class SecurityConfig {
 
     private final JwtProvider jwtProvider;
+    private final ObjectMapper objectMapper;
 
-    public SecurityConfig(JwtProvider jwtProvider) {
+    public SecurityConfig(JwtProvider jwtProvider, ObjectMapper objectMapper) {
         this.jwtProvider = jwtProvider;
+        this.objectMapper = objectMapper;
     }
 
     @Bean
@@ -43,6 +46,10 @@ public class SecurityConfig {
                         .requestMatchers("/api-docs/**", "/v3/api-docs/**").permitAll()
                         .requestMatchers("/api/v1/auth/**").permitAll()
                         .anyRequest().authenticated()
+                )
+                .exceptionHandling(eh -> eh
+                        .authenticationEntryPoint(new ApiAuthenticationEntryPoint(objectMapper))
+                        .accessDeniedHandler(new ApiAccessDeniedHandler(objectMapper))
                 )
                 .addFilterBefore(new JwtAuthenticationFilter(jwtProvider), UsernamePasswordAuthenticationFilter.class)
                 .build();
