@@ -6,11 +6,8 @@ import com.lastcup.api.domain.auth.dto.response.AuthTokensResponse;
 import com.lastcup.api.domain.auth.dto.response.UserSummaryResponse;
 import com.lastcup.api.domain.user.domain.SocialAuth;
 import com.lastcup.api.domain.user.domain.User;
-import com.lastcup.api.domain.user.domain.UserStatus;
 import com.lastcup.api.domain.user.repository.SocialAuthRepository;
 import com.lastcup.api.domain.user.repository.UserRepository;
-import com.lastcup.api.infrastructure.oauth.KakaoClient;
-import com.lastcup.api.infrastructure.oauth.AppleClient;
 import com.lastcup.api.infrastructure.oauth.OAuthTokenVerifier;
 import com.lastcup.api.infrastructure.oauth.SocialProvider;
 import com.lastcup.api.infrastructure.oauth.VerifiedOAuthUser;
@@ -23,8 +20,6 @@ import java.util.List;
 public class SocialLoginService {
 
     private final List<OAuthTokenVerifier> verifiers;
-    private final KakaoClient kakaoClient;
-    private final AppleClient appleClient;
     private final UserRepository userRepository;
     private final SocialAuthRepository socialAuthRepository;
     private final NicknameGenerator nicknameGenerator;
@@ -32,16 +27,12 @@ public class SocialLoginService {
 
     public SocialLoginService(
             List<OAuthTokenVerifier> verifiers,
-            KakaoClient kakaoClient,
-            AppleClient appleClient,
             UserRepository userRepository,
             SocialAuthRepository socialAuthRepository,
             NicknameGenerator nicknameGenerator,
             TokenService tokenService
     ) {
         this.verifiers = verifiers;
-        this.kakaoClient = kakaoClient;
-        this.appleClient = appleClient;
         this.userRepository = userRepository;
         this.socialAuthRepository = socialAuthRepository;
         this.nicknameGenerator = nicknameGenerator;
@@ -50,75 +41,26 @@ public class SocialLoginService {
 
     @Transactional
     public AuthResponse login(SocialProvider provider, SocialLoginRequest request) {
-        VerifiedOAuthUser verified = verifyWithProvider(provider, request);
-        return loginWithVerified(provider, verified);
-    }
+        OAuthTokenVerifier verifier = findVerifier(provider);
 
-    private VerifiedOAuthUser verifyWithProvider(SocialProvider provider, SocialLoginRequest request) {
-        if (provider == SocialProvider.KAKAO) {
-            return kakaoClient.verifyAuthorizationCode(extractAuthorizationCode(request));
-        }
-        if (provider == SocialProvider.APPLE) {
-            return appleClient.verifyAuthorizationCode(
-                    extractAuthorizationCode(request),
-                    request.identityToken()
-            );
-        }
-        return findVerifier(provider).verify(extractProviderAccessToken(request));
-    }
+        VerifiedOAuthUser verified =
+                verifier.verify(request.providerToken());
 
-    private String extractAuthorizationCode(SocialLoginRequest request) {
-        String code = request.authorizationCode();
-        if (code == null || code.isBlank()) {
-            throw new IllegalArgumentException("authorizationCode is required");
-        }
-        return code;
-    }
+        String email = verified.email() != null
+                ? verified.email()
+                : request.email();
 
-    private String extractProviderAccessToken(SocialLoginRequest request) {
-        String token = request.providerAccessToken();
-        if (token == null || token.isBlank()) {
-            throw new IllegalArgumentException("providerAccessToken is required");
-        }
-        return token;
-    }
+        VerifiedOAuthUser resolved =
+                new VerifiedOAuthUser(
+                        verified.providerUserKey(),
+                        email,
+                        verified.profileImageUrl()
+                );
 
-    private AuthResponse loginWithVerified(SocialProvider provider, VerifiedOAuthUser verified) {
-        return socialAuthRepository.findByProviderAndProviderUserKey(provider, verified.providerUserKey())
+        return socialAuthRepository
+                .findByProviderAndProviderUserKey(provider, resolved.providerUserKey())
                 .map(this::loginExistingUser)
-                .orElseGet(() -> signupNewUser(provider, verified));
-    }
-
-    private AuthResponse loginExistingUser(SocialAuth socialAuth) {
-        User user = userRepository.findById(socialAuth.getUserId())
-                .orElseThrow(() -> new IllegalStateException("user not found"));
-        validateUserStatus(user);
-
-        AuthTokensResponse tokens = tokenService.createTokens(user.getId());
-        return new AuthResponse(new UserSummaryResponse(user.getId(), user.getNickname()), tokens, false);
-    }
-
-    private AuthResponse signupNewUser(SocialProvider provider, VerifiedOAuthUser verified) {
-        User user = userRepository.save(User.create(createUniqueNickname(), verified.profileImageUrl()));
-        socialAuthRepository.save(SocialAuth.create(
-                user.getId(),
-                provider,
-                verified.providerUserKey(),
-                verified.email()
-        ));
-
-        AuthTokensResponse tokens = tokenService.createTokens(user.getId());
-        return new AuthResponse(new UserSummaryResponse(user.getId(), user.getNickname()), tokens, true);
-    }
-
-    private String createUniqueNickname() {
-        for (int i = 0; i < 20; i++) {
-            String nickname = nicknameGenerator.create();
-            if (!userRepository.existsByNickname(nickname)) {
-                return nickname;
-            }
-        }
-        throw new IllegalStateException("nickname create failed");
+                .orElseGet(() -> signupNewUser(provider, resolved));
     }
 
     private OAuthTokenVerifier findVerifier(SocialProvider provider) {
@@ -128,10 +70,45 @@ public class SocialLoginService {
                 .orElseThrow(() -> new IllegalArgumentException("unsupported provider"));
     }
 
-    private void validateUserStatus(User user) {
-        if (user.getStatus() == UserStatus.ACTIVE) {
-            return;
+    private AuthResponse loginExistingUser(SocialAuth socialAuth) {
+        User user = userRepository.findById(socialAuth.getUserId())
+                .orElseThrow(() -> new IllegalStateException("user not found"));
+
+        AuthTokensResponse tokens = tokenService.createTokens(user.getId());
+        return new AuthResponse(
+                new UserSummaryResponse(user.getId(), user.getNickname()),
+                tokens,
+                false
+        );
+    }
+
+    private AuthResponse signupNewUser(SocialProvider provider, VerifiedOAuthUser verified) {
+        if (verified.email() != null && userRepository.existsByEmail(verified.email())) {
+            throw new IllegalArgumentException("email already exists");
         }
-        throw new IllegalArgumentException("user is not active");
+
+        User user = userRepository.save(
+                User.create(
+                        nicknameGenerator.create(),
+                        verified.email(),
+                        verified.profileImageUrl()
+                )
+        );
+
+        socialAuthRepository.save(
+                SocialAuth.create(
+                        user.getId(),
+                        provider,
+                        verified.providerUserKey(),
+                        verified.email()
+                )
+        );
+
+        AuthTokensResponse tokens = tokenService.createTokens(user.getId());
+        return new AuthResponse(
+                new UserSummaryResponse(user.getId(), user.getNickname()),
+                tokens,
+                true
+        );
     }
 }

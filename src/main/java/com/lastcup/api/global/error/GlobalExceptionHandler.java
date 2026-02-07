@@ -107,12 +107,15 @@ public class GlobalExceptionHandler {
         return switch (message) {
             case "loginId already exists" -> AuthErrorCode.AUTH_DUPLICATE_LOGIN_ID;
             case "nickname already exists" -> AuthErrorCode.AUTH_DUPLICATE_NICKNAME;
+            case "email already exists" -> AuthErrorCode.AUTH_DUPLICATE_EMAIL;
             case "loginId not found", "password mismatch", "user is not active" ->
                     AuthErrorCode.AUTH_INVALID_CREDENTIALS;
             case "unsupported provider" -> AuthErrorCode.AUTH_PROVIDER_INVALID;
             case "authorizationCode is required" -> AuthErrorCode.AUTH_AUTHORIZATION_CODE_REQUIRED;
             case "Bearer Token is missing" -> JwtErrorCode.JWT_TOKEN_MISSING;
             case "user not found" -> UserErrorCode.USER_NOT_FOUND;
+            case "local auth not found", "password reset token not found" -> CommonErrorCode.COMMON_NOT_FOUND;
+            case "password reset token invalid" -> CommonErrorCode.COMMON_BAD_REQUEST;
             case "user goal not found" -> CommonErrorCode.COMMON_NOT_FOUND;
             case "file is empty" -> UserErrorCode.USER_PROFILE_IMAGE_REQUIRED;
             case "file is not image" -> StorageErrorCode.STORAGE_INVALID_CONTENT_TYPE;

@@ -14,6 +14,9 @@ public class User extends BaseTimeEntity {
     @Column(nullable = false, length = 50)
     private String nickname;
 
+    @Column(nullable = false, unique = true, length = 100)
+    private String email;
+
     @Column(length = 500)
     private String profileImageUrl;
 
@@ -24,15 +27,17 @@ public class User extends BaseTimeEntity {
     protected User() {
     }
 
-    private User(String nickname, String profileImageUrl) {
+    private User(String nickname, String email, String profileImageUrl) {
         this.nickname = nickname;
+        this.email = email;
         this.profileImageUrl = profileImageUrl;
         this.status = UserStatus.ACTIVE;
     }
 
-    public static User create(String nickname, String profileImageUrl) {
+    public static User create(String nickname, String email, String profileImageUrl) {
         validateNickname(nickname);
-        return new User(nickname, profileImageUrl);
+        validateEmail(email);
+        return new User(nickname, email, profileImageUrl);
     }
 
     public void updateProfileImage(String profileImageUrl) {
@@ -54,12 +59,22 @@ public class User extends BaseTimeEntity {
         }
     }
 
+    private static void validateEmail(String email) {
+        if (email == null || email.isBlank()) {
+            throw new IllegalArgumentException("email is blank");
+        }
+    }
+
     public Long getId() {
         return id;
     }
 
     public String getNickname() {
         return nickname;
+    }
+
+    public String getEmail() {
+        return email;
     }
 
     public String getProfileImageUrl() {

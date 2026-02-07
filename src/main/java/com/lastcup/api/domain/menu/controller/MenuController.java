@@ -4,17 +4,20 @@ import com.lastcup.api.global.response.ApiResponse;
 import com.lastcup.api.domain.menu.domain.MenuCategory;
 import com.lastcup.api.domain.menu.domain.TemperatureType;
 import com.lastcup.api.domain.menu.dto.response.MenuDetailResponse;
+import com.lastcup.api.domain.menu.dto.response.MenuFavoriteItemResponse;
 import com.lastcup.api.domain.menu.dto.response.MenuListItemResponse;
 import com.lastcup.api.domain.menu.dto.response.MenuSearchResponse;
 import com.lastcup.api.domain.menu.dto.response.MenuSizeDetailResponse;
 import com.lastcup.api.domain.menu.dto.response.MenuSizeResponse;
 import com.lastcup.api.domain.menu.dto.response.PageResponse;
 import com.lastcup.api.domain.menu.service.MenuService;
+import com.lastcup.api.security.AuthUser;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.List;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -39,13 +42,14 @@ public class MenuController {
     @SecurityRequirement(name = "BearerAuth")
     @GetMapping("/brands/{brandId}/menus")
     public ApiResponse<PageResponse<MenuListItemResponse>> findBrandMenus(
+            @AuthenticationPrincipal AuthUser authUser,
             @PathVariable Long brandId,
             @RequestParam(required = false) MenuCategory category,
             @RequestParam(required = false) String keyword,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size
     ) {
-        return ApiResponse.success(menuService.findBrandMenus(brandId, category, keyword, page, size));
+        return ApiResponse.success(menuService.findBrandMenus(brandId, category, keyword, page, size, getUserIdOrNull(authUser)));
     }
 
     @Operation(
@@ -55,11 +59,12 @@ public class MenuController {
     @SecurityRequirement(name = "BearerAuth")
     @GetMapping("/menus/search")
     public ApiResponse<PageResponse<MenuSearchResponse>> searchMenus(
+            @AuthenticationPrincipal AuthUser authUser,
             @RequestParam String keyword,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size
     ) {
-        return ApiResponse.success(menuService.searchMenus(keyword, page, size));
+        return ApiResponse.success(menuService.searchMenus(keyword, page, size, getUserIdOrNull(authUser)));
     }
 
     @Operation(
@@ -94,5 +99,21 @@ public class MenuController {
     @GetMapping("/menus/sizes/{menuSizeId}")
     public ApiResponse<MenuSizeDetailResponse> findMenuSizeDetail(@PathVariable Long menuSizeId) {
         return ApiResponse.success(menuService.findMenuSizeDetail(menuSizeId));
+    }
+
+    @Operation(summary = "메뉴 즐겨찾기 목록 조회", description = "사용자의 즐겨찾기 메뉴 목록을 반환합니다.")
+    @SecurityRequirement(name = "BearerAuth")
+    @GetMapping("/menus/favorites")
+    public ApiResponse<List<MenuFavoriteItemResponse>> findFavoriteMenus(
+            @AuthenticationPrincipal AuthUser authUser
+    ) {
+        return ApiResponse.success(menuService.findFavoriteMenus(authUser.userId()));
+    }
+
+    private Long getUserIdOrNull(AuthUser authUser) {
+        if (authUser == null) {
+            return null;
+        }
+        return authUser.userId();
     }
 }

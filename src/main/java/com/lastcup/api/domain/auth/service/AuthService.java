@@ -43,7 +43,7 @@ public class AuthService {
     public AuthResultResponse createSignup(SignupRequest request) {
         validateSignup(request);
 
-        User user = userRepository.save(User.create(request.nickname(), null));
+        User user = userRepository.save(User.create(request.nickname(), request.email(), null));
         localAuthRepository.save(createLocalAuth(user.getId(), request));
 
         AuthTokensResponse tokens = tokenService.createTokens(user.getId());
@@ -96,6 +96,9 @@ public class AuthService {
     private void validateSignup(SignupRequest request) {
         if (localAuthRepository.existsByLoginId(request.loginId())) {
             throw new IllegalArgumentException("loginId already exists");
+        }
+        if (userRepository.existsByEmail(request.email())) {
+            throw new IllegalArgumentException("email already exists");
         }
         if (userRepository.existsByNickname(request.nickname())) {
             throw new IllegalArgumentException("nickname already exists");

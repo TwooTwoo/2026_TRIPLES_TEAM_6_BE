@@ -14,6 +14,9 @@ public record MenuSearchResponse(
         String name,
 
         @Schema(description = "이미지 URL", example = "https://...")
-        String imageUrl
+        String imageUrl,
+
+        @Schema(description = "즐겨찾기 여부", example = "true")
+        boolean isFavorite
 ) {
 }

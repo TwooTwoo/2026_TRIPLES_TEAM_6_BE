@@ -14,6 +14,22 @@ spring:
     username: ${DB_USER}
     password: ${DB_PASS}
 
+  mail:
+    host: ${MAIL_HOST:smtp.naver.com}
+    port: ${MAIL_PORT:465}
+    username: ${MAIL_USERNAME}
+    password: ${MAIL_PASSWORD}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          ssl:
+            enable: true
+          starttls:
+            enable: true
+            required: true
+    default-encoding: UTF-8
+
   jpa:
     hibernate:
       ddl-auto: update
@@ -29,24 +45,19 @@ app:
     google:
       client-ids: ${GOOGLE_CLIENT_IDS:${GOOGLE_CLIENT_ID}}
     kakao:
-      client-id: ${KAKAO_CLIENT_ID}
-      client-secret: ${KAKAO_CLIENT_SECRET:}
-      redirect-uri: ${KAKAO_REDIRECT_URI:}
-      token-url: ${KAKAO_TOKEN_URL:https://kauth.kakao.com/oauth/token}
       user-info-url: ${KAKAO_USER_INFO_URL:https://kapi.kakao.com/v2/user/me?secure_resource=true}
     apple:
       client-id: ${APPLE_CLIENT_ID:}
-      team-id: ${APPLE_TEAM_ID:}
-      key-id: ${APPLE_KEY_ID:}
-      private-key: ${APPLE_PRIVATE_KEY:}
-      redirect-uri: ${APPLE_REDIRECT_URI:}
-      token-url: ${APPLE_TOKEN_URL:https://appleid.apple.com/auth/token}
       key-url: ${APPLE_KEY_URL:https://appleid.apple.com/auth/keys}
     swagger:
       server-url: ${SWAGGER_SERVER_URL:https://api.lastcup.site}
       server-description: ${SWAGGER_SERVER_DESCRIPTION:API Server}
       local-server-url: ${SWAGGER_LOCAL_SERVER_URL:http://localhost:8080}
       local-server-description: ${SWAGGER_LOCAL_SERVER_DESCRIPTION:Local Server}
+  password-reset:
+    base-url: ${PASSWORD_RESET_BASE_URL:lastcup://password-reset}
+    token-ttl-minutes: ${PASSWORD_RESET_TTL_MINUTES:30}
+    from-address: ${PASSWORD_RESET_FROM:${MAIL_USERNAME}}
 # JWT
 jwt:
   issuer: ${JWT_ISSUER:lastcup}
