@@ -124,7 +124,9 @@ public class GlobalExceptionHandler {
         if (message.startsWith("Menu not found")
                 || message.startsWith("Brand not found")
                 || message.startsWith("MenuTemperature not found")
-                || message.startsWith("MenuSize not found")) {
+                || message.startsWith("MenuSize not found")
+                || message.startsWith("Option not found")
+                || message.startsWith("Intake not found")) {
             return CommonErrorCode.COMMON_NOT_FOUND;
         }
         return CommonErrorCode.COMMON_BAD_REQUEST;
