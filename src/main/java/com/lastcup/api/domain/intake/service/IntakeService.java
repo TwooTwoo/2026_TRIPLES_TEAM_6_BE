@@ -3,18 +3,30 @@ package com.lastcup.api.domain.intake.service;
 import com.lastcup.api.domain.goal.domain.UserGoal;
 import com.lastcup.api.domain.goal.service.UserGoalService;
 import com.lastcup.api.domain.intake.domain.Intake;
+import com.lastcup.api.domain.intake.domain.IntakeOption;
 import com.lastcup.api.domain.intake.dto.request.CreateIntakeRequest;
 import com.lastcup.api.domain.intake.dto.request.IntakeOptionRequest;
+import com.lastcup.api.domain.intake.dto.response.DailyIntakeSummaryResponse;
+import com.lastcup.api.domain.intake.dto.response.IntakeDetailResponse;
+import com.lastcup.api.domain.intake.dto.response.IntakeHistoryItemResponse;
+import com.lastcup.api.domain.intake.dto.response.IntakeOptionDetailResponse;
 import com.lastcup.api.domain.intake.dto.response.IntakeOptionResponse;
 import com.lastcup.api.domain.intake.dto.response.IntakeResponse;
+import com.lastcup.api.domain.intake.dto.response.PeriodIntakeSummaryResponse;
 import com.lastcup.api.domain.intake.repository.IntakeRepository;
+import com.lastcup.api.domain.menu.domain.Menu;
 import com.lastcup.api.domain.menu.domain.MenuSize;
+import com.lastcup.api.domain.menu.domain.MenuTemperature;
 import com.lastcup.api.domain.menu.domain.Nutrition;
 import com.lastcup.api.domain.menu.repository.MenuSizeRepository;
+import com.lastcup.api.domain.option.domain.Option;
 import com.lastcup.api.domain.option.repository.OptionRepository;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -71,6 +83,104 @@ public class IntakeService {
         return toResponse(saved);
     }
 
+    @Transactional(readOnly = true)
+    public DailyIntakeSummaryResponse findDailyIntakes(Long userId, LocalDate date) {
+        LocalDate targetDate = date != null ? date : LocalDate.now();
+
+        List<Intake> intakes = intakeRepository.findDailyIntakes(userId, targetDate);
+
+        Map<Long, MenuSize> menuSizeMap = fetchMenuSizeMap(intakes);
+        Map<Long, String> optionNameMap = fetchOptionNameMap(intakes);
+
+        List<IntakeHistoryItemResponse> items = intakes.stream()
+                .map(intake -> toHistoryItem(intake, menuSizeMap, optionNameMap))
+                .toList();
+
+        int totalCaffeine = intakes.stream().mapToInt(Intake::getCaffeineSnapshot).sum();
+        int totalSugar = intakes.stream().mapToInt(Intake::getSugarSnapshot).sum();
+        int intakeCount = intakes.stream().mapToInt(Intake::getQuantity).sum();
+
+        Optional<UserGoal> goalOpt = userGoalService.findOptionalByDate(userId, targetDate);
+        int goalCaffeine = goalOpt.map(UserGoal::getDailyCaffeineTarget)
+                .orElse(UserGoalService.DEFAULT_DAILY_CAFFEINE_TARGET);
+        int goalSugar = goalOpt.map(UserGoal::getDailySugarTarget)
+                .orElse(UserGoalService.DEFAULT_DAILY_SUGAR_TARGET);
+
+        return new DailyIntakeSummaryResponse(
+                targetDate, totalCaffeine, totalSugar,
+                goalCaffeine, goalSugar, intakeCount, items
+        );
+    }
+
+    @Transactional(readOnly = true)
+    public PeriodIntakeSummaryResponse findPeriodIntakes(Long userId, LocalDate startDate, LocalDate endDate) {
+        if (startDate.isAfter(endDate)) {
+            throw new IllegalArgumentException("startDate cannot be after endDate");
+        }
+
+        List<Intake> intakes = intakeRepository.findPeriodIntakes(userId, startDate, endDate);
+
+        Map<Long, MenuSize> menuSizeMap = fetchMenuSizeMap(intakes);
+        Map<Long, String> optionNameMap = fetchOptionNameMap(intakes);
+
+        List<IntakeHistoryItemResponse> items = intakes.stream()
+                .map(intake -> toHistoryItem(intake, menuSizeMap, optionNameMap))
+                .toList();
+
+        int totalCaffeine = intakes.stream().mapToInt(Intake::getCaffeineSnapshot).sum();
+        int totalSugar = intakes.stream().mapToInt(Intake::getSugarSnapshot).sum();
+        int intakeCount = intakes.stream().mapToInt(Intake::getQuantity).sum();
+
+        return new PeriodIntakeSummaryResponse(
+                startDate, endDate, totalCaffeine, totalSugar, intakeCount, items
+        );
+    }
+
+    @Transactional(readOnly = true)
+    public IntakeDetailResponse findIntakeDetail(Long userId, Long intakeId) {
+        Intake intake = intakeRepository.findByIdAndUserId(intakeId, userId)
+                .orElseThrow(() -> new IllegalArgumentException("Intake not found: " + intakeId));
+
+        Map<Long, MenuSize> menuSizeMap = fetchMenuSizeMap(List.of(intake));
+        Map<Long, String> optionNameMap = fetchOptionNameMap(List.of(intake));
+
+        MenuSize menuSize = menuSizeMap.get(intake.getMenuSizeId());
+        String brandName = "";
+        String menuName = "";
+        String temperature = "";
+        String sizeName = "";
+
+        if (menuSize != null) {
+            MenuTemperature mt = menuSize.getMenuTemperature();
+            Menu menu = mt.getMenu();
+            brandName = menu.getBrand().getName();
+            menuName = menu.getName();
+            temperature = mt.getTemperature().name();
+            sizeName = menuSize.getSizeName();
+        }
+
+        List<IntakeOptionDetailResponse> options = toOptionDetails(intake, optionNameMap);
+
+        return new IntakeDetailResponse(
+                intake.getId(),
+                intake.getIntakeDate(),
+                brandName, menuName, temperature, sizeName,
+                intake.getQuantity(),
+                intake.getCaffeineSnapshot(),
+                intake.getSugarSnapshot(),
+                intake.getCaloriesSnapshot(),
+                intake.getSodiumSnapshot(),
+                intake.getProteinSnapshot(),
+                intake.getFatSnapshot(),
+                intake.getGoalCaffeineTargetSnapshot(),
+                intake.getGoalSugarTargetSnapshot(),
+                options,
+                intake.getCreatedAt()
+        );
+    }
+
+    // ── 생성 관련 private 메서드 ──
+
     private MenuSize findMenuSizeWithNutrition(Long menuSizeId) {
         return menuSizeRepository.findDetailById(menuSizeId)
                 .orElseThrow(() -> new IllegalArgumentException("MenuSize not found: " + menuSizeId));
@@ -100,6 +210,82 @@ public class IntakeService {
         }
     }
 
+    // ── 조회 관련 private 메서드 ──
+
+    private Map<Long, MenuSize> fetchMenuSizeMap(List<Intake> intakes) {
+        Set<Long> menuSizeIds = intakes.stream()
+                .map(Intake::getMenuSizeId)
+                .collect(Collectors.toSet());
+
+        if (menuSizeIds.isEmpty()) {
+            return Map.of();
+        }
+
+        return menuSizeRepository.findAllDetailByIds(menuSizeIds).stream()
+                .collect(Collectors.toMap(MenuSize::getId, Function.identity()));
+    }
+
+    private Map<Long, String> fetchOptionNameMap(List<Intake> intakes) {
+        Set<Long> optionIds = intakes.stream()
+                .flatMap(i -> i.getIntakeOptions().stream())
+                .map(IntakeOption::getOptionId)
+                .collect(Collectors.toSet());
+
+        if (optionIds.isEmpty()) {
+            return Map.of();
+        }
+
+        return optionRepository.findAllById(optionIds).stream()
+                .collect(Collectors.toMap(Option::getId, Option::getName));
+    }
+
+    private IntakeHistoryItemResponse toHistoryItem(
+            Intake intake,
+            Map<Long, MenuSize> menuSizeMap,
+            Map<Long, String> optionNameMap
+    ) {
+        MenuSize menuSize = menuSizeMap.get(intake.getMenuSizeId());
+
+        String brandName = "";
+        String menuName = "";
+        String temperature = "";
+        String sizeName = "";
+
+        if (menuSize != null) {
+            MenuTemperature mt = menuSize.getMenuTemperature();
+            Menu menu = mt.getMenu();
+            brandName = menu.getBrand().getName();
+            menuName = menu.getName();
+            temperature = mt.getTemperature().name();
+            sizeName = menuSize.getSizeName();
+        }
+
+        List<IntakeOptionDetailResponse> options = toOptionDetails(intake, optionNameMap);
+
+        return new IntakeHistoryItemResponse(
+                intake.getId(),
+                intake.getIntakeDate(),
+                brandName, menuName, temperature, sizeName,
+                intake.getCaffeineSnapshot(),
+                intake.getSugarSnapshot(),
+                intake.getQuantity(),
+                options,
+                intake.getCreatedAt()
+        );
+    }
+
+    private List<IntakeOptionDetailResponse> toOptionDetails(Intake intake, Map<Long, String> optionNameMap) {
+        return intake.getIntakeOptions().stream()
+                .map(o -> new IntakeOptionDetailResponse(
+                        o.getOptionId(),
+                        optionNameMap.getOrDefault(o.getOptionId(), ""),
+                        o.getQuantity()
+                ))
+                .toList();
+    }
+
+    // ── 생성 응답 변환 ──
+
     private IntakeResponse toResponse(Intake intake) {
         List<IntakeOptionResponse> optionResponses = intake.getIntakeOptions().stream()
                 .map(o -> new IntakeOptionResponse(o.getOptionId(), o.getQuantity()))
@@ -123,6 +309,8 @@ public class IntakeService {
                 intake.getCreatedAt()
         );
     }
+
+    // ── 유틸 ──
 
     private LocalDate resolveIntakeDate(LocalDate intakeDate) {
         return intakeDate != null ? intakeDate : LocalDate.now();
