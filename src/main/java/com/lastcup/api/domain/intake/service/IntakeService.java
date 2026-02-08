@@ -6,6 +6,7 @@ import com.lastcup.api.domain.intake.domain.Intake;
 import com.lastcup.api.domain.intake.domain.IntakeOption;
 import com.lastcup.api.domain.intake.dto.request.CreateIntakeRequest;
 import com.lastcup.api.domain.intake.dto.request.IntakeOptionRequest;
+import com.lastcup.api.domain.intake.dto.request.IntakeUpdateRequest;
 import com.lastcup.api.domain.intake.dto.response.DailyIntakeSummaryResponse;
 import com.lastcup.api.domain.intake.dto.response.IntakeDetailResponse;
 import com.lastcup.api.domain.intake.dto.response.IntakeHistoryItemResponse;
@@ -81,6 +82,49 @@ public class IntakeService {
 
         Intake saved = intakeRepository.save(intake);
         return toResponse(saved);
+    }
+
+    /**
+     * 섭취 기록 수정: 음료(MenuSize)·날짜·수량·옵션을 변경하고 영양 스냅샷을 재계산한다.
+     * 기존 옵션을 모두 제거한 뒤 새 옵션으로 교체한다(전체 교체 방식).
+     */
+    public IntakeResponse updateIntake(Long userId, Long intakeId, IntakeUpdateRequest request) {
+        Intake intake = findIntakeByIdAndUserId(intakeId, userId);
+
+        MenuSize menuSize = findMenuSizeWithNutrition(request.menuSizeId());
+        UserGoal goal = userGoalService.findByDate(userId, request.intakeDate());
+        Nutrition nutrition = menuSize.getNutrition();
+        int quantity = request.quantity();
+
+        validateOptions(request.options());
+
+        intake.update(
+                request.intakeDate(),
+                menuSize.getId(),
+                quantity,
+                multiplyOrZero(nutrition.getCaffeineMg(), quantity),
+                multiplyOrZero(nutrition.getSugarG(), quantity),
+                multiplyNullable(nutrition.getCalories(), quantity),
+                multiplyNullable(nutrition.getSodiumMg(), quantity),
+                multiplyNullable(nutrition.getProteinG(), quantity),
+                multiplyNullable(nutrition.getFatG(), quantity),
+                goal.getDailyCaffeineTarget(),
+                goal.getDailySugarTarget()
+        );
+
+        // 옵션 전체 교체: 기존 옵션 삭제 후 새 옵션 추가
+        // flush()로 DELETE를 먼저 DB에 반영해야 uk_intake_option 유니크 제약 위반을 방지할 수 있다.
+        // (JPA 기본 flush 순서: INSERT → UPDATE → DELETE 이므로, 같은 optionId가 있으면 충돌)
+        intake.clearOptions();
+        intakeRepository.flush();
+        addOptions(intake, request.options());
+
+        return toResponse(intake);
+    }
+
+    public void deleteIntake(Long userId, Long intakeId) {
+        Intake intake = findIntakeByIdAndUserId(intakeId, userId);
+        intakeRepository.delete(intake);
     }
 
     @Transactional(readOnly = true)

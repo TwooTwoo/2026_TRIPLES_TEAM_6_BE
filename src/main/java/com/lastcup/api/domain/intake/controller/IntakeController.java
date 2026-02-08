@@ -1,6 +1,7 @@
 package com.lastcup.api.domain.intake.controller;
 
 import com.lastcup.api.domain.intake.dto.request.CreateIntakeRequest;
+import com.lastcup.api.domain.intake.dto.request.IntakeUpdateRequest;
 import com.lastcup.api.domain.intake.dto.response.DailyIntakeSummaryResponse;
 import com.lastcup.api.domain.intake.dto.response.IntakeDetailResponse;
 import com.lastcup.api.domain.intake.dto.response.IntakeResponse;
@@ -17,9 +18,11 @@ import java.time.LocalDate;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -84,5 +87,28 @@ public class IntakeController {
     ) {
         IntakeDetailResponse response = intakeService.findIntakeDetail(authUser.userId(), intakeId);
         return ApiResponse.success(response);
+    }
+
+    @Operation(summary = "섭취 기록 수정", description = "특정 섭취 기록의 음료·날짜·수량·옵션을 수정합니다. 영양 스냅샷이 재계산됩니다.")
+    @SecurityRequirement(name = "BearerAuth")
+    @PutMapping("/{intakeId}")
+    public ApiResponse<IntakeResponse> updateIntake(
+            @AuthenticationPrincipal AuthUser authUser,
+            @PathVariable Long intakeId,
+            @RequestBody @Valid IntakeUpdateRequest request
+    ) {
+        IntakeResponse response = intakeService.updateIntake(authUser.userId(), intakeId, request);
+        return ApiResponse.success(response);
+    }
+
+    @Operation(summary = "섭취 기록 삭제", description = "특정 섭취 기록을 삭제합니다.")
+    @SecurityRequirement(name = "BearerAuth")
+    @DeleteMapping("/{intakeId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteIntake(
+            @AuthenticationPrincipal AuthUser authUser,
+            @PathVariable Long intakeId
+    ) {
+        intakeService.deleteIntake(authUser.userId(), intakeId);
     }
 }
