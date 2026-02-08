@@ -59,23 +59,16 @@ public class IntakeService {
 
         MenuSize menuSize = findMenuSizeWithNutrition(request.menuSizeId());
         UserGoal goal = userGoalService.findByDate(userId, intakeDate);
-        Nutrition nutrition = menuSize.getNutrition();
 
         validateOptions(request.options());
 
+        NutritionSnapshots snapshots = calculateNutritionSnapshots(menuSize.getNutrition(), quantity);
         Intake intake = Intake.create(
-                userId,
-                intakeDate,
-                menuSize.getId(),
-                quantity,
-                multiplyOrZero(nutrition.getCaffeineMg(), quantity),
-                multiplyOrZero(nutrition.getSugarG(), quantity),
-                multiplyNullable(nutrition.getCalories(), quantity),
-                multiplyNullable(nutrition.getSodiumMg(), quantity),
-                multiplyNullable(nutrition.getProteinG(), quantity),
-                multiplyNullable(nutrition.getFatG(), quantity),
-                goal.getDailyCaffeineTarget(),
-                goal.getDailySugarTarget()
+                userId, intakeDate, menuSize.getId(), quantity,
+                snapshots.caffeine(), snapshots.sugar(),
+                snapshots.calories(), snapshots.sodium(),
+                snapshots.protein(), snapshots.fat(),
+                goal.getDailyCaffeineTarget(), goal.getDailySugarTarget()
         );
 
         addOptions(intake, request.options());
@@ -93,28 +86,20 @@ public class IntakeService {
 
         MenuSize menuSize = findMenuSizeWithNutrition(request.menuSizeId());
         UserGoal goal = userGoalService.findByDate(userId, request.intakeDate());
-        Nutrition nutrition = menuSize.getNutrition();
         int quantity = request.quantity();
 
         validateOptions(request.options());
 
+        NutritionSnapshots snapshots = calculateNutritionSnapshots(menuSize.getNutrition(), quantity);
         intake.update(
-                request.intakeDate(),
-                menuSize.getId(),
-                quantity,
-                multiplyOrZero(nutrition.getCaffeineMg(), quantity),
-                multiplyOrZero(nutrition.getSugarG(), quantity),
-                multiplyNullable(nutrition.getCalories(), quantity),
-                multiplyNullable(nutrition.getSodiumMg(), quantity),
-                multiplyNullable(nutrition.getProteinG(), quantity),
-                multiplyNullable(nutrition.getFatG(), quantity),
-                goal.getDailyCaffeineTarget(),
-                goal.getDailySugarTarget()
+                request.intakeDate(), menuSize.getId(), quantity,
+                snapshots.caffeine(), snapshots.sugar(),
+                snapshots.calories(), snapshots.sodium(),
+                snapshots.protein(), snapshots.fat(),
+                goal.getDailyCaffeineTarget(), goal.getDailySugarTarget()
         );
 
-        // 옵션 전체 교체: 기존 옵션 삭제 후 새 옵션 추가
-        // flush()로 DELETE를 먼저 DB에 반영해야 uk_intake_option 유니크 제약 위반을 방지할 수 있다.
-        // (JPA 기본 flush 순서: INSERT → UPDATE → DELETE 이므로, 같은 optionId가 있으면 충돌)
+        // 옵션 전체 교체 – flush()로 DELETE 선반영하여 유니크 제약 충돌 방지
         intake.clearOptions();
         intakeRepository.flush();
         addOptions(intake, request.options());
@@ -341,7 +326,7 @@ public class IntakeService {
                 .toList();
     }
 
-    // ── 생성 응답 변환 ──
+    // ── 응답 변환 ──
 
     private IntakeResponse toResponse(Intake intake) {
         List<IntakeOptionResponse> optionResponses = intake.getIntakeOptions().stream()
@@ -364,6 +349,25 @@ public class IntakeService {
                 intake.getGoalSugarTargetSnapshot(),
                 optionResponses,
                 intake.getCreatedAt()
+        );
+    }
+
+    // ── 영양 스냅샷 계산 ──
+
+    private record NutritionSnapshots(
+            int caffeine, int sugar,
+            Integer calories, Integer sodium, Integer protein, Integer fat
+    ) {
+    }
+
+    private NutritionSnapshots calculateNutritionSnapshots(Nutrition nutrition, int quantity) {
+        return new NutritionSnapshots(
+                multiplyOrZero(nutrition.getCaffeineMg(), quantity),
+                multiplyOrZero(nutrition.getSugarG(), quantity),
+                multiplyNullable(nutrition.getCalories(), quantity),
+                multiplyNullable(nutrition.getSodiumMg(), quantity),
+                multiplyNullable(nutrition.getProteinG(), quantity),
+                multiplyNullable(nutrition.getFatG(), quantity)
         );
     }
 
