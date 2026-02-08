@@ -122,6 +122,48 @@ public class Intake extends BaseTimeEntity {
         this.intakeOptions.add(option);
     }
 
+    /**
+     * 섭취 기록을 다른 음료/수량으로 수정한다.
+     * 영양 스냅샷은 Service가 새 MenuSize 기준으로 계산하여 전달한다.
+     */
+    public void update(
+            LocalDate intakeDate,
+            Long menuSizeId,
+            int quantity,
+            int caffeineSnapshot,
+            int sugarSnapshot,
+            Integer caloriesSnapshot,
+            Integer sodiumSnapshot,
+            Integer proteinSnapshot,
+            Integer fatSnapshot,
+            int goalCaffeineTargetSnapshot,
+            int goalSugarTargetSnapshot
+    ) {
+        validateIntakeDate(intakeDate);
+        validateMenuSizeId(menuSizeId);
+        validateQuantity(quantity);
+
+        this.intakeDate = intakeDate;
+        this.menuSizeId = menuSizeId;
+        this.quantity = quantity;
+        this.caffeineSnapshot = caffeineSnapshot;
+        this.sugarSnapshot = sugarSnapshot;
+        this.caloriesSnapshot = caloriesSnapshot;
+        this.sodiumSnapshot = sodiumSnapshot;
+        this.proteinSnapshot = proteinSnapshot;
+        this.fatSnapshot = fatSnapshot;
+        this.goalCaffeineTargetSnapshot = goalCaffeineTargetSnapshot;
+        this.goalSugarTargetSnapshot = goalSugarTargetSnapshot;
+    }
+
+    /**
+     * 기존 옵션을 모두 제거한다.
+     * orphanRemoval = true 이므로 clear() 호출 시 DB에서도 삭제된다.
+     */
+    public void clearOptions() {
+        this.intakeOptions.clear();
+    }
+
     private static void validateUserId(Long userId) {
         if (userId == null || userId <= 0) {
             throw new IllegalArgumentException("userId is invalid");
