@@ -8,6 +8,7 @@ import com.lastcup.api.domain.user.domain.SocialAuth;
 import com.lastcup.api.domain.user.domain.User;
 import com.lastcup.api.domain.user.repository.SocialAuthRepository;
 import com.lastcup.api.domain.user.repository.UserRepository;
+import com.lastcup.api.domain.user.service.UserNotificationSettingService;
 import com.lastcup.api.infrastructure.oauth.OAuthTokenVerifier;
 import com.lastcup.api.infrastructure.oauth.SocialProvider;
 import com.lastcup.api.infrastructure.oauth.VerifiedOAuthUser;
@@ -28,19 +29,22 @@ public class SocialLoginService {
     private final SocialAuthRepository socialAuthRepository;
     private final NicknameGenerator nicknameGenerator;
     private final TokenService tokenService;
+    private final UserNotificationSettingService notificationSettingService;
 
     public SocialLoginService(
             List<OAuthTokenVerifier> verifiers,
             UserRepository userRepository,
             SocialAuthRepository socialAuthRepository,
             NicknameGenerator nicknameGenerator,
-            TokenService tokenService
+            TokenService tokenService,
+            UserNotificationSettingService notificationSettingService
     ) {
         this.verifiers = verifiers;
         this.userRepository = userRepository;
         this.socialAuthRepository = socialAuthRepository;
         this.nicknameGenerator = nicknameGenerator;
         this.tokenService = tokenService;
+        this.notificationSettingService = notificationSettingService;
     }
 
     /**
@@ -144,6 +148,7 @@ public class SocialLoginService {
                         verified.email()
                 )
         );
+        notificationSettingService.ensureDefaultExists(user.getId());
 
         AuthTokensResponse tokens = tokenService.createTokens(user.getId());
         return new AuthResponse(
