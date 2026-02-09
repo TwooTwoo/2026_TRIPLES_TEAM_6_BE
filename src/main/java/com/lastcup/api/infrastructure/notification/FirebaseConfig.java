@@ -10,8 +10,9 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-import java.io.FileInputStream;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 
 @Configuration
 @EnableConfigurationProperties(FirebaseProperties.class)
@@ -30,13 +31,14 @@ public class FirebaseConfig {
         if (!FirebaseApp.getApps().isEmpty()) {
             return FirebaseApp.getInstance();
         }
-        String credentialsPath = properties.credentialsPath();
-        if (credentialsPath == null || credentialsPath.isBlank()) {
-            log.error("Firebase credentials path is not configured. Set app.firebase.credentials-path.");
-            throw new IllegalStateException("Firebase credentials path is required.");
+        String adminKey = properties.adminKey();
+        if (adminKey == null || adminKey.isBlank()) {
+            log.error("Firebase admin key is not configured. Set app.firebase.admin-key.");
+            throw new IllegalStateException("Firebase admin key is required.");
         }
         FirebaseOptions options = FirebaseOptions.builder()
-                .setCredentials(GoogleCredentials.fromStream(new FileInputStream(credentialsPath)))
+                .setCredentials(GoogleCredentials.fromStream(
+                        new ByteArrayInputStream(adminKey.getBytes(StandardCharsets.UTF_8))))
                 .build();
         return FirebaseApp.initializeApp(options);
     }
