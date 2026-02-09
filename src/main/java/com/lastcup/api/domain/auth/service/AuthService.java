@@ -10,6 +10,7 @@ import com.lastcup.api.domain.user.domain.User;
 import com.lastcup.api.domain.user.domain.UserStatus;
 import com.lastcup.api.domain.user.repository.LocalAuthRepository;
 import com.lastcup.api.domain.user.repository.UserRepository;
+import com.lastcup.api.domain.user.service.UserNotificationSettingService;
 import com.lastcup.api.security.AuthUser;
 import com.lastcup.api.security.JwtProvider;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -24,19 +25,22 @@ public class AuthService {
     private final UserRepository userRepository;
     private final LocalAuthRepository localAuthRepository;
     private final PasswordEncoder passwordEncoder;
+    private final UserNotificationSettingService notificationSettingService;
 
     public AuthService(
             JwtProvider jwtProvider,
             TokenService tokenService,
             UserRepository userRepository,
             LocalAuthRepository localAuthRepository,
-            PasswordEncoder passwordEncoder
+            PasswordEncoder passwordEncoder,
+            UserNotificationSettingService notificationSettingService
     ) {
         this.jwtProvider = jwtProvider;
         this.tokenService = tokenService;
         this.userRepository = userRepository;
         this.localAuthRepository = localAuthRepository;
         this.passwordEncoder = passwordEncoder;
+        this.notificationSettingService = notificationSettingService;
     }
 
     @Transactional
@@ -45,6 +49,7 @@ public class AuthService {
 
         User user = userRepository.save(User.create(request.nickname(), request.email(), null));
         localAuthRepository.save(createLocalAuth(user.getId(), request));
+        notificationSettingService.ensureDefaultExists(user.getId());
 
         AuthTokensResponse tokens = tokenService.createTokens(user.getId());
         return new AuthResultResponse(new UserSummaryResponse(user.getId(), user.getNickname()), tokens);

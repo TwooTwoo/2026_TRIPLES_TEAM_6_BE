@@ -23,7 +23,6 @@ public class UserNotificationSettingService {
         this.repository = repository;
     }
 
-    @Transactional(readOnly = true)
     public NotificationSettingResponse findOrCreate(Long userId) {
         UserNotificationSetting setting = repository.findById(userId)
                 .orElseGet(() -> createDefault(userId));
@@ -43,6 +42,18 @@ public class UserNotificationSettingService {
         repository.save(setting);
 
         return new UpdateNotificationSettingResponse(true);
+    }
+
+    /**
+     * 회원가입 시 기본 알림 설정을 생성합니다.
+     * 기획 회의에서 정의한 14:00, 19:00 기본값을 사용합니다.
+     * 이미 존재하면 무시합니다.
+     */
+    public void ensureDefaultExists(Long userId) {
+        if (repository.existsById(userId)) {
+            return;
+        }
+        createDefault(userId);
     }
 
     private UserNotificationSetting createDefault(Long userId) {
