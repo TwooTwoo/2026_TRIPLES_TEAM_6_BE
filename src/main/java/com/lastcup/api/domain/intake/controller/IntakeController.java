@@ -5,6 +5,7 @@ import com.lastcup.api.domain.intake.dto.request.IntakeUpdateRequest;
 import com.lastcup.api.domain.intake.dto.response.DailyIntakeSummaryResponse;
 import com.lastcup.api.domain.intake.dto.response.IntakeDetailResponse;
 import com.lastcup.api.domain.intake.dto.response.IntakeResponse;
+import com.lastcup.api.domain.intake.dto.response.PeriodIntakeStatisticsResponse;
 import com.lastcup.api.domain.intake.dto.response.PeriodIntakeSummaryResponse;
 import com.lastcup.api.domain.intake.service.IntakeService;
 import com.lastcup.api.global.response.ApiResponse;
@@ -64,7 +65,7 @@ public class IntakeController {
         return ApiResponse.success(response);
     }
 
-    @Operation(summary = "기간별 섭취 이력 조회", description = "시작~종료 날짜 범위의 섭취 이력과 요약을 조회합니다.")
+    @Operation(summary = "기간별 섭취 기록 건별 조회", description = "시작~종료 날짜 범위의 개별 섭취 기록 목록과 요약을 조회합니다.")
     @SecurityRequirement(name = "BearerAuth")
     @GetMapping("/period")
     public ApiResponse<PeriodIntakeSummaryResponse> findPeriodIntakes(
@@ -75,6 +76,26 @@ public class IntakeController {
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate
     ) {
         PeriodIntakeSummaryResponse response = intakeService.findPeriodIntakes(authUser.userId(), startDate, endDate);
+        return ApiResponse.success(response);
+    }
+
+    @Operation(
+            summary = "기간별 섭취 기록 통합 조회",
+            description = "시작~종료 날짜 범위의 총 섭취량 요약과 음료 종류별 그룹 통계를 조회합니다. "
+                    + "같은 음료라도 ICE/HOT, 사이즈, 옵션 조합이 다르면 별도로 집계됩니다."
+    )
+    @SecurityRequirement(name = "BearerAuth")
+    @GetMapping("/period/statistics")
+    public ApiResponse<PeriodIntakeStatisticsResponse> findPeriodIntakeStatistics(
+            @AuthenticationPrincipal AuthUser authUser,
+            @Parameter(description = "시작 날짜", example = "2026-01-08")
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @Parameter(description = "종료 날짜", example = "2026-01-13")
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate
+    ) {
+        PeriodIntakeStatisticsResponse response = intakeService.findPeriodIntakeStatistics(
+                authUser.userId(), startDate, endDate
+        );
         return ApiResponse.success(response);
     }
 

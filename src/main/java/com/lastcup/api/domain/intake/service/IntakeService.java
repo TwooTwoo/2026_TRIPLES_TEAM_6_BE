@@ -8,11 +8,13 @@ import com.lastcup.api.domain.intake.dto.request.CreateIntakeRequest;
 import com.lastcup.api.domain.intake.dto.request.IntakeOptionRequest;
 import com.lastcup.api.domain.intake.dto.request.IntakeUpdateRequest;
 import com.lastcup.api.domain.intake.dto.response.DailyIntakeSummaryResponse;
+import com.lastcup.api.domain.intake.dto.response.DrinkGroupResponse;
 import com.lastcup.api.domain.intake.dto.response.IntakeDetailResponse;
 import com.lastcup.api.domain.intake.dto.response.IntakeHistoryItemResponse;
 import com.lastcup.api.domain.intake.dto.response.IntakeOptionDetailResponse;
 import com.lastcup.api.domain.intake.dto.response.IntakeOptionResponse;
 import com.lastcup.api.domain.intake.dto.response.IntakeResponse;
+import com.lastcup.api.domain.intake.dto.response.PeriodIntakeStatisticsResponse;
 import com.lastcup.api.domain.intake.dto.response.PeriodIntakeSummaryResponse;
 import com.lastcup.api.domain.intake.repository.IntakeRepository;
 import com.lastcup.api.domain.menu.domain.Menu;
@@ -23,6 +25,8 @@ import com.lastcup.api.domain.menu.repository.MenuSizeRepository;
 import com.lastcup.api.domain.option.domain.Option;
 import com.lastcup.api.domain.option.repository.OptionRepository;
 import java.time.LocalDate;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -137,6 +141,8 @@ public class IntakeService {
 
         return new DailyIntakeSummaryResponse(
                 targetDate, totalCaffeine, totalSugar,
+                Intake.toEspressoShotCount(totalCaffeine),
+                Intake.toSugarCubeCount(totalSugar),
                 goalCaffeine, goalSugar, intakeCount, items
         );
     }
@@ -161,7 +167,39 @@ public class IntakeService {
         int intakeCount = intakes.stream().mapToInt(Intake::getQuantity).sum();
 
         return new PeriodIntakeSummaryResponse(
-                startDate, endDate, totalCaffeine, totalSugar, intakeCount, items
+                startDate, endDate, totalCaffeine, totalSugar,
+                Intake.toEspressoShotCount(totalCaffeine),
+                Intake.toSugarCubeCount(totalSugar),
+                intakeCount, items
+        );
+    }
+
+    /**
+     * 기간별 음료 통계 조회: 기간 내 총 섭취량 요약 + 음료 종류별 그룹 통계를 반환한다.
+     * 같은 음료라도 ICE/HOT, 사이즈, 옵션 조합이 하나라도 다르면 별도 그룹으로 집계한다.
+     */
+    @Transactional(readOnly = true)
+    public PeriodIntakeStatisticsResponse findPeriodIntakeStatistics(
+            Long userId, LocalDate startDate, LocalDate endDate
+    ) {
+        if (startDate.isAfter(endDate)) {
+            throw new IllegalArgumentException("startDate cannot be after endDate");
+        }
+
+        List<Intake> intakes = intakeRepository.findPeriodIntakes(userId, startDate, endDate);
+
+        int totalCaffeine = intakes.stream().mapToInt(Intake::getCaffeineSnapshot).sum();
+        int totalSugar = intakes.stream().mapToInt(Intake::getSugarSnapshot).sum();
+
+        Map<Long, MenuSize> menuSizeMap = fetchMenuSizeMap(intakes);
+        Map<Long, String> optionNameMap = fetchOptionNameMap(intakes);
+        List<DrinkGroupResponse> drinkGroups = buildDrinkGroups(intakes, menuSizeMap, optionNameMap);
+
+        return new PeriodIntakeStatisticsResponse(
+                startDate, endDate, totalCaffeine, totalSugar,
+                Intake.toEspressoShotCount(totalCaffeine),
+                Intake.toSugarCubeCount(totalSugar),
+                drinkGroups
         );
     }
 
@@ -203,6 +241,8 @@ public class IntakeService {
                 intake.getQuantity(),
                 intake.getCaffeineSnapshot(),
                 intake.getSugarSnapshot(),
+                intake.getEspressoShotCount(),
+                intake.getSugarCubeCount(),
                 intake.getCaloriesSnapshot(),
                 intake.getSodiumSnapshot(),
                 intake.getProteinSnapshot(),
@@ -310,6 +350,8 @@ public class IntakeService {
                 brandName, menuName, temperature, sizeName,
                 intake.getCaffeineSnapshot(),
                 intake.getSugarSnapshot(),
+                intake.getEspressoShotCount(),
+                intake.getSugarCubeCount(),
                 intake.getQuantity(),
                 options,
                 intake.getCreatedAt()
@@ -324,6 +366,107 @@ public class IntakeService {
                         o.getQuantity()
                 ))
                 .toList();
+    }
+
+    // ── 음료 종류별 그룹핑 ──
+
+    /**
+     * 음료를 menuSizeId + 옵션 조합(optionId:quantity)으로 그룹핑한다.
+     * 같은 음료라도 ICE/HOT, 사이즈, 옵션이 하나라도 다르면 별도 그룹이 된다.
+     */
+    private List<DrinkGroupResponse> buildDrinkGroups(
+            List<Intake> intakes,
+            Map<Long, MenuSize> menuSizeMap,
+            Map<Long, String> optionNameMap
+    ) {
+        Map<DrinkGroupKey, List<Intake>> grouped = intakes.stream()
+                .collect(Collectors.groupingBy(
+                        this::toDrinkGroupKey,
+                        LinkedHashMap::new,
+                        Collectors.toList()
+                ));
+
+        return grouped.entrySet().stream()
+                .map(entry -> toDrinkGroupResponse(entry.getKey(), entry.getValue(), menuSizeMap, optionNameMap))
+                .sorted(Comparator.comparingInt(DrinkGroupResponse::totalQuantity).reversed())
+                .toList();
+    }
+
+    /**
+     * Intake → 그룹핑 키 변환.
+     * 옵션 목록은 optionId 기준으로 정렬하여 순서 무관하게 동일한 키를 생성한다.
+     */
+    private DrinkGroupKey toDrinkGroupKey(Intake intake) {
+        List<OptionKey> sortedOptions = intake.getIntakeOptions().stream()
+                .map(o -> new OptionKey(o.getOptionId(), o.getQuantity()))
+                .sorted()
+                .toList();
+        return new DrinkGroupKey(intake.getMenuSizeId(), sortedOptions);
+    }
+
+    private DrinkGroupResponse toDrinkGroupResponse(
+            DrinkGroupKey key,
+            List<Intake> groupIntakes,
+            Map<Long, MenuSize> menuSizeMap,
+            Map<Long, String> optionNameMap
+    ) {
+        int totalQuantity = groupIntakes.stream().mapToInt(Intake::getQuantity).sum();
+        int totalCaffeine = groupIntakes.stream().mapToInt(Intake::getCaffeineSnapshot).sum();
+        int totalSugar = groupIntakes.stream().mapToInt(Intake::getSugarSnapshot).sum();
+
+        int caffeinePerUnit = totalQuantity > 0
+                ? (int) Math.round((double) totalCaffeine / totalQuantity)
+                : 0;
+        int sugarPerUnit = totalQuantity > 0
+                ? (int) Math.round((double) totalSugar / totalQuantity)
+                : 0;
+
+        MenuSize menuSize = menuSizeMap.get(key.menuSizeId());
+        String brandName = "";
+        String menuName = "";
+        String temperature = "";
+        String sizeName = "";
+
+        if (menuSize != null) {
+            MenuTemperature mt = menuSize.getMenuTemperature();
+            Menu menu = mt.getMenu();
+            brandName = menu.getBrand().getName();
+            menuName = menu.getName();
+            temperature = mt.getTemperature().name();
+            sizeName = menuSize.getSizeName();
+        }
+
+        List<IntakeOptionDetailResponse> options = key.options().stream()
+                .map(o -> new IntakeOptionDetailResponse(
+                        o.optionId(),
+                        optionNameMap.getOrDefault(o.optionId(), ""),
+                        o.quantity()
+                ))
+                .toList();
+
+        return new DrinkGroupResponse(
+                brandName, menuName, temperature, sizeName,
+                options, totalQuantity, caffeinePerUnit, sugarPerUnit
+        );
+    }
+
+    /**
+     * 음료 그룹핑 키: menuSizeId + 정렬된 옵션 조합.
+     * record이므로 equals/hashCode가 모든 필드 기반으로 자동 생성된다.
+     */
+    private record DrinkGroupKey(Long menuSizeId, List<OptionKey> options) {
+    }
+
+    /**
+     * 옵션 키: optionId + quantity 조합.
+     * optionId 기준 정렬을 위해 Comparable을 구현한다.
+     */
+    private record OptionKey(Long optionId, int quantity) implements Comparable<OptionKey> {
+        @Override
+        public int compareTo(OptionKey other) {
+            int cmp = this.optionId.compareTo(other.optionId);
+            return cmp != 0 ? cmp : Integer.compare(this.quantity, other.quantity);
+        }
     }
 
     // ── 응답 변환 ──
@@ -341,6 +484,8 @@ public class IntakeService {
                 intake.getQuantity(),
                 intake.getCaffeineSnapshot(),
                 intake.getSugarSnapshot(),
+                intake.getEspressoShotCount(),
+                intake.getSugarCubeCount(),
                 intake.getCaloriesSnapshot(),
                 intake.getSodiumSnapshot(),
                 intake.getProteinSnapshot(),

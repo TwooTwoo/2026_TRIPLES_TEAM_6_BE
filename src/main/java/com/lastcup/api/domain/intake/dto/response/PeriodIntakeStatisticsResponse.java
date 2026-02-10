@@ -4,8 +4,8 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.LocalDate;
 import java.util.List;
 
-@Schema(description = "기간별 섭취 요약 응답")
-public record PeriodIntakeSummaryResponse(
+@Schema(description = "기간별 음료 통계 응답")
+public record PeriodIntakeStatisticsResponse(
 
         @Schema(description = "시작 날짜", example = "2026-01-08")
         LocalDate startDate,
@@ -25,10 +25,7 @@ public record PeriodIntakeSummaryResponse(
         @Schema(description = "총 각설탕 환산 개수 (3g = 1개)", example = "311")
         int totalSugarCubeCount,
 
-        @Schema(description = "총 잔 수", example = "34")
-        int intakeCount,
-
-        @Schema(description = "섭취 이력 목록")
-        List<IntakeHistoryItemResponse> intakes
+        @Schema(description = "음료 종류별 통계 목록 (잔 수 내림차순)")
+        List<DrinkGroupResponse> drinkGroups
 ) {
 }
