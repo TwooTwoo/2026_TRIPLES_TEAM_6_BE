@@ -18,6 +18,11 @@ import java.util.List;
 @Table(name = "intake")
 public class Intake extends BaseTimeEntity {
 
+    /** 에스프레소 1잔 기준 카페인(mg) */
+    public static final double CAFFEINE_MG_PER_ESPRESSO_SHOT = 75.0;
+    /** 각설탕 1개 기준 당류(g) */
+    public static final double SUGAR_G_PER_SUGAR_CUBE = 3.0;
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -44,6 +49,14 @@ public class Intake extends BaseTimeEntity {
     private Integer sodiumSnapshot;
     private Integer proteinSnapshot;
     private Integer fatSnapshot;
+
+    /** 카페인을 에스프레소 잔 수로 환산한 값 (75mg = 1잔, 반올림) */
+    @Column(nullable = false)
+    private int espressoShotCount;
+
+    /** 당류를 각설탕 개수로 환산한 값 (3g = 1개, 반올림) */
+    @Column(nullable = false)
+    private int sugarCubeCount;
 
     @Column(nullable = false)
     private int goalCaffeineTargetSnapshot;
@@ -86,6 +99,8 @@ public class Intake extends BaseTimeEntity {
         this.sodiumSnapshot = sodiumSnapshot;
         this.proteinSnapshot = proteinSnapshot;
         this.fatSnapshot = fatSnapshot;
+        this.espressoShotCount = toEspressoShotCount(caffeineSnapshot);
+        this.sugarCubeCount = toSugarCubeCount(sugarSnapshot);
         this.goalCaffeineTargetSnapshot = goalCaffeineTargetSnapshot;
         this.goalSugarTargetSnapshot = goalSugarTargetSnapshot;
     }
@@ -152,6 +167,8 @@ public class Intake extends BaseTimeEntity {
         this.sodiumSnapshot = sodiumSnapshot;
         this.proteinSnapshot = proteinSnapshot;
         this.fatSnapshot = fatSnapshot;
+        this.espressoShotCount = toEspressoShotCount(caffeineSnapshot);
+        this.sugarCubeCount = toSugarCubeCount(sugarSnapshot);
         this.goalCaffeineTargetSnapshot = goalCaffeineTargetSnapshot;
         this.goalSugarTargetSnapshot = goalSugarTargetSnapshot;
     }
@@ -259,7 +276,33 @@ public class Intake extends BaseTimeEntity {
         return evaluatedAt;
     }
 
+    public int getEspressoShotCount() {
+        return espressoShotCount;
+    }
+
+    public int getSugarCubeCount() {
+        return sugarCubeCount;
+    }
+
     public List<IntakeOption> getIntakeOptions() {
         return intakeOptions;
+    }
+
+    // ── 환산 유틸 ──
+
+    /**
+     * 카페인(mg)을 에스프레소 잔 수로 환산한다 (75mg = 1잔, 반올림).
+     * "에스프레소 약 n잔" 표시에 사용되며, 반올림이 수학적으로 가장 가까운 정수를 제공한다.
+     */
+    public static int toEspressoShotCount(int caffeineMg) {
+        return (int) Math.round(caffeineMg / CAFFEINE_MG_PER_ESPRESSO_SHOT);
+    }
+
+    /**
+     * 당류(g)를 각설탕 개수로 환산한다 (3g = 1개, 반올림).
+     * "각설탕 약 n개" 표시에 사용되며, 반올림이 수학적으로 가장 가까운 정수를 제공한다.
+     */
+    public static int toSugarCubeCount(int sugarG) {
+        return (int) Math.round(sugarG / SUGAR_G_PER_SUGAR_CUBE);
     }
 }
