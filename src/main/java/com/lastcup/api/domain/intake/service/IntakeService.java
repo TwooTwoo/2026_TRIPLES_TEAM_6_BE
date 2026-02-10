@@ -336,7 +336,7 @@ public class IntakeService {
 
         return grouped.entrySet().stream()
                 .map(entry -> toDrinkGroupResponse(entry.getKey(), entry.getValue(), menuSizeMap, optionNameMap))
-                .sorted(Comparator.comparingInt(DrinkGroupResponse::totalQuantity).reversed())
+                .sorted(Comparator.comparingInt(DrinkGroupResponse::quantity).reversed())
                 .toList();
     }
 
@@ -394,10 +394,11 @@ public class IntakeService {
 
         return new DrinkGroupResponse(
                 brandName, menuName, temperature, sizeName,
-                options, totalQuantity, caffeinePerUnit, sugarPerUnit,
                 totalCaffeine, totalSugar,
                 Intake.toEspressoShotCount(totalCaffeine),
-                Intake.toSugarCubeCount(totalSugar)
+                Intake.toSugarCubeCount(totalSugar),
+                totalQuantity, options,
+                caffeinePerUnit, sugarPerUnit
         );
     }
 
