@@ -392,7 +392,12 @@ public class IntakeService {
                 ))
                 .toList();
 
+        List<Long> intakeIds = groupIntakes.stream()
+                .map(Intake::getId)
+                .toList();
+
         return new DrinkGroupResponse(
+                intakeIds,
                 brandName, menuName, temperature, sizeName,
                 totalCaffeine, totalSugar,
                 Intake.toEspressoShotCount(totalCaffeine),

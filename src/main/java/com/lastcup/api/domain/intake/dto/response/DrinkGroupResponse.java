@@ -6,6 +6,9 @@ import java.util.List;
 @Schema(description = "음료 종류별 통계 항목")
 public record DrinkGroupResponse(
 
+        @Schema(description = "그룹에 포함된 섭취 기록 ID 목록", example = "[101, 102, 103]")
+        List<Long> intakeIds,
+
         @Schema(description = "브랜드명", example = "스타벅스")
         String brandName,
 
