@@ -16,22 +16,14 @@ public record OptionResponse(
         OptionCategory category,
 
         @Schema(description = "옵션 선택 방식", example = "COUNT")
-        OptionSelectionType selectionType,
-
-        @Schema(description = "옵션 1개당 카페인(mg). 영양 정보가 없는 옵션은 null", example = "75")
-        Integer caffeineMg
+        OptionSelectionType selectionType
 ) {
     public static OptionResponse from(Option option) {
-        Integer caffeineMg = option.getNutrition() != null
-                ? option.getNutrition().getCaffeineMg()
-                : null;
-
         return new OptionResponse(
                 option.getId(),
                 option.getName(),
                 option.getCategory(),
-                option.getSelectionType(),
-                caffeineMg
+                option.getSelectionType()
         );
     }
 }
