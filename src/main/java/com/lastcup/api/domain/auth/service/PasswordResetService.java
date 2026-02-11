@@ -61,7 +61,7 @@ public class PasswordResetService {
         LocalDateTime expiresAt = LocalDateTime.now().plusMinutes(properties.getTokenTtlMinutes());
         tokenRepository.save(PasswordResetToken.create(user.getId(), token, expiresAt));
 
-        sendResetMail(request.email(), buildResetLink(user.getId(), token));
+        sendResetMail(request.email(), buildResetLink(token));
     }
 
     @Transactional
@@ -81,13 +81,10 @@ public class PasswordResetService {
         token.use(now);
     }
 
-    private String buildResetLink(Long userId, String token) {
+    private String buildResetLink(String token) {
         String baseUrl = Objects.requireNonNullElse(properties.getBaseUrl(), "");
         String delimiter = baseUrl.contains("?") ? "&" : "?";
-        return baseUrl
-                + delimiter
-                + "id=" + URLEncoder.encode(String.valueOf(userId), StandardCharsets.UTF_8)
-                + "&token=" + URLEncoder.encode(token, StandardCharsets.UTF_8);
+        return baseUrl + delimiter + "token=" + URLEncoder.encode(token, StandardCharsets.UTF_8);
     }
 
     private void sendResetMail(String email, String link) {
