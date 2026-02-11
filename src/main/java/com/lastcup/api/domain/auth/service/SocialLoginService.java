@@ -4,6 +4,7 @@ import com.lastcup.api.domain.auth.dto.request.SocialLoginRequest;
 import com.lastcup.api.domain.auth.dto.response.AuthResponse;
 import com.lastcup.api.domain.auth.dto.response.AuthTokensResponse;
 import com.lastcup.api.domain.auth.dto.response.UserSummaryResponse;
+import com.lastcup.api.domain.user.dto.response.LoginType;
 import com.lastcup.api.domain.user.domain.SocialAuth;
 import com.lastcup.api.domain.user.domain.User;
 import com.lastcup.api.domain.user.repository.SocialAuthRepository;
@@ -121,7 +122,9 @@ public class SocialLoginService {
         return new AuthResponse(
                 new UserSummaryResponse(user.getId(), user.getNickname()),
                 tokens,
-                false
+                false,
+                LoginType.SOCIAL,
+                socialAuth.getProvider()
         );
     }
 
@@ -154,7 +157,9 @@ public class SocialLoginService {
         return new AuthResponse(
                 new UserSummaryResponse(user.getId(), user.getNickname()),
                 tokens,
-                true
+                true,
+                LoginType.SOCIAL,
+                provider
         );
     }
 }
