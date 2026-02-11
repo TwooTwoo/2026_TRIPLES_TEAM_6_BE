@@ -7,6 +7,7 @@ import com.lastcup.api.domain.auth.dto.response.UserSummaryResponse;
 import com.lastcup.api.domain.user.dto.response.LoginType;
 import com.lastcup.api.domain.user.domain.SocialAuth;
 import com.lastcup.api.domain.user.domain.User;
+import com.lastcup.api.domain.user.domain.UserStatus;
 import com.lastcup.api.domain.user.repository.SocialAuthRepository;
 import com.lastcup.api.domain.user.repository.UserRepository;
 import com.lastcup.api.domain.user.service.UserNotificationSettingService;
@@ -108,6 +109,8 @@ public class SocialLoginService {
         User user = userRepository.findById(socialAuth.getUserId())
                 .orElseThrow(() -> new IllegalStateException("user not found"));
 
+        validateUserStatus(user);
+
         // Apple 이메일 보충: 기존에 이메일 없이 가입된 경우 업데이트
         if (email != null && !email.isBlank()) {
             boolean userUpdated = user.updateEmailIfAbsent(email);
@@ -126,6 +129,13 @@ public class SocialLoginService {
                 LoginType.SOCIAL,
                 socialAuth.getProvider()
         );
+    }
+
+    private void validateUserStatus(User user) {
+        if (user.getStatus() == UserStatus.ACTIVE) {
+            return;
+        }
+        throw new IllegalArgumentException("user is not active");
     }
 
     private AuthResponse signupNewUser(SocialProvider provider, VerifiedOAuthUser verified) {
