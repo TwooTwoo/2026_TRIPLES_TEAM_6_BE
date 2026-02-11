@@ -5,6 +5,7 @@ import com.lastcup.api.domain.auth.dto.request.SignupRequest;
 import com.lastcup.api.domain.auth.dto.response.AuthResultResponse;
 import com.lastcup.api.domain.auth.dto.response.AuthTokensResponse;
 import com.lastcup.api.domain.auth.dto.response.UserSummaryResponse;
+import com.lastcup.api.domain.user.dto.response.LoginType;
 import com.lastcup.api.domain.user.domain.LocalAuth;
 import com.lastcup.api.domain.user.domain.User;
 import com.lastcup.api.domain.user.domain.UserStatus;
@@ -60,7 +61,12 @@ public class AuthService {
         notificationSettingService.ensureDefaultExists(user.getId());
 
         AuthTokensResponse tokens = tokenService.createTokens(user.getId());
-        return new AuthResultResponse(new UserSummaryResponse(user.getId(), user.getNickname()), tokens);
+        return new AuthResultResponse(
+                new UserSummaryResponse(user.getId(), user.getNickname()),
+                tokens,
+                LoginType.LOCAL,
+                null
+        );
     }
 
     @Transactional(readOnly = true)
@@ -76,7 +82,12 @@ public class AuthService {
         validateUserStatus(user);
 
         AuthTokensResponse tokens = tokenService.createTokens(user.getId());
-        return new AuthResultResponse(new UserSummaryResponse(user.getId(), user.getNickname()), tokens);
+        return new AuthResultResponse(
+                new UserSummaryResponse(user.getId(), user.getNickname()),
+                tokens,
+                LoginType.LOCAL,
+                null
+        );
     }
 
     public boolean findLoginIdAvailability(String loginId) {
