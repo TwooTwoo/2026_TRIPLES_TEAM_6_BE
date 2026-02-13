@@ -3,6 +3,7 @@ package com.lastcup.api.domain.auth.controller;
 import com.lastcup.api.domain.auth.dto.request.LoginRequest;
 import com.lastcup.api.domain.auth.dto.request.PasswordResetConfirmRequest;
 import com.lastcup.api.domain.auth.dto.request.PasswordResetRequest;
+import com.lastcup.api.domain.auth.dto.request.PasswordResetVerifyRequest;
 import com.lastcup.api.domain.auth.dto.request.SignupRequest;
 import com.lastcup.api.domain.auth.dto.request.SocialLoginRequest;
 import com.lastcup.api.domain.auth.dto.response.AuthResponse;
@@ -92,14 +93,26 @@ public class AuthController {
         return ApiResponse.success(tokens);
     }
 
-    @Operation(summary = "비밀번호 재설정 링크 요청", description = "이메일로 비밀번호 재설정 링크를 전송합니다.")
+    @Operation(
+            summary = "비밀번호 재설정 인증 코드 요청",
+            description = "아이디/이메일 확인 후 이메일로 인증 코드를 전송합니다."
+    )
     @PostMapping("/password-reset/request")
-    public ApiResponse<Boolean> requestPasswordReset(@RequestBody @Valid PasswordResetRequest request) {
+    public ApiResponse<Boolean> requestPasswordReset(
+            @RequestBody @Valid PasswordResetRequest request
+    ) {
         passwordResetService.requestReset(request);
         return ApiResponse.success(true);
     }
 
-    @Operation(summary = "비밀번호 재설정", description = "토큰을 검증하고 새 비밀번호로 변경합니다.")
+    @Operation(summary = "비밀번호 재설정 인증 코드 검증", description = "이메일로 받은 인증 코드가 유효한지 검증합니다.")
+    @PostMapping("/password-reset/verify")
+    public ApiResponse<Boolean> verifyPasswordResetCode(@RequestBody @Valid PasswordResetVerifyRequest request) {
+        passwordResetService.verifyResetCode(request);
+        return ApiResponse.success(true);
+    }
+
+    @Operation(summary = "비밀번호 재설정", description = "인증 코드를 검증하고 새 비밀번호로 변경합니다.")
     @PostMapping("/password-reset/confirm")
     public ApiResponse<Boolean> confirmPasswordReset(@RequestBody @Valid PasswordResetConfirmRequest request) {
         passwordResetService.confirmReset(request);

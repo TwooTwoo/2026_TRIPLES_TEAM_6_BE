@@ -7,6 +7,7 @@ import com.lastcup.api.domain.auth.domain.PasswordResetToken;
 import com.lastcup.api.domain.auth.dto.request.PasswordResetConfirmRequest;
 import com.lastcup.api.domain.auth.dto.request.PasswordResetRequest;
 import com.lastcup.api.domain.auth.repository.PasswordResetTokenRepository;
+import com.lastcup.api.domain.auth.dto.request.PasswordResetVerifyRequest;
 import com.lastcup.api.domain.user.domain.LocalAuth;
 import com.lastcup.api.domain.user.domain.User;
 import com.lastcup.api.domain.user.repository.LocalAuthRepository;
@@ -19,14 +20,16 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.security.SecureRandom;
 import java.time.LocalDateTime;
-import java.util.Objects;
-import java.util.UUID;
+import java.util.Locale;
 
 @Service
 public class PasswordResetService {
+
+    private static final int VERIFICATION_CODE_LENGTH = 5;
+    private static final String VERIFICATION_CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
     private final UserRepository userRepository;
     private final LocalAuthRepository localAuthRepository;
@@ -34,6 +37,7 @@ public class PasswordResetService {
     private final PasswordEncoder passwordEncoder;
     private final JavaMailSender mailSender;
     private final PasswordResetProperties properties;
+    private final SecureRandom secureRandom = new SecureRandom();
 
     public PasswordResetService(
             UserRepository userRepository,
@@ -56,24 +60,37 @@ public class PasswordResetService {
         User user = userRepository.findByEmail(request.email())
                 .orElseThrow(() -> new IllegalArgumentException("user not found"));
 
-        localAuthRepository.findById(user.getId())
+        LocalAuth localAuth = localAuthRepository.findByLoginId(request.loginId())
                 .orElseThrow(() -> new IllegalArgumentException("local auth not found"));
 
-        String token = UUID.randomUUID().toString();
-        LocalDateTime expiresAt = LocalDateTime.now(KST).plusMinutes(properties.getTokenTtlMinutes());
-        tokenRepository.save(PasswordResetToken.create(user.getId(), token, expiresAt));
+        if (!user.getId().equals(localAuth.getUserId())) {
+            throw new IllegalArgumentException("loginId and email mismatch");
+        }
 
-        sendResetMail(request.email(), buildResetLink(token));
+        String verificationCode = generateVerificationCode();
+        LocalDateTime expiresAt = LocalDateTime.now().plusMinutes(properties.getTokenTtlMinutes());
+        tokenRepository.save(PasswordResetToken.create(user.getId(), verificationCode, expiresAt));
+
+        sendResetMail(request.email(), verificationCode);
     }
+
+    @Transactional(readOnly = true)
+    public void verifyResetCode(PasswordResetVerifyRequest request) {
+        PasswordResetToken token = getValidToken(request.loginId(), request.email(), request.verificationCode());
+        LocalDateTime now = LocalDateTime.now();
+        if (token.isUsed() || token.isExpired(now)) {
+            throw new IllegalArgumentException("password reset code invalid");
+        }
+    }
+
 
     @Transactional
     public void confirmReset(PasswordResetConfirmRequest request) {
-        PasswordResetToken token = tokenRepository.findByToken(request.token())
-                .orElseThrow(() -> new IllegalArgumentException("password reset token not found"));
+        PasswordResetToken token = getValidToken(request.loginId(), request.email(), request.verificationCode());
 
         LocalDateTime now = LocalDateTime.now(KST);
         if (token.isUsed() || token.isExpired(now)) {
-            throw new IllegalArgumentException("password reset token invalid");
+            throw new IllegalArgumentException("password reset code invalid");
         }
 
         LocalAuth localAuth = localAuthRepository.findById(token.getUserId())
@@ -83,13 +100,37 @@ public class PasswordResetService {
         token.use(now);
     }
 
-    private String buildResetLink(String token) {
-        String baseUrl = Objects.requireNonNullElse(properties.getBaseUrl(), "");
-        String delimiter = baseUrl.contains("?") ? "&" : "?";
-        return baseUrl + delimiter + "token=" + URLEncoder.encode(token, StandardCharsets.UTF_8);
+    private PasswordResetToken getValidToken(String loginId, String email, String verificationCode) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalArgumentException("user not found"));
+
+        LocalAuth localAuth = localAuthRepository.findByLoginId(loginId)
+                .orElseThrow(() -> new IllegalArgumentException("local auth not found"));
+
+        if (!user.getId().equals(localAuth.getUserId())) {
+            throw new IllegalArgumentException("loginId and email mismatch");
+        }
+
+        return tokenRepository.findByToken(verificationCode.toUpperCase(Locale.ROOT))
+                .filter(found -> found.getUserId().equals(user.getId()))
+                .orElseThrow(() -> new IllegalArgumentException("password reset code not found"));
     }
 
-    private void sendResetMail(String email, String link) {
+    private String generateVerificationCode() {
+        StringBuilder builder = new StringBuilder(VERIFICATION_CODE_LENGTH);
+        for (int i = 0; i < VERIFICATION_CODE_LENGTH; i++) {
+            int index = secureRandom.nextInt(VERIFICATION_CODE_CHARS.length());
+            builder.append(VERIFICATION_CODE_CHARS.charAt(index));
+        }
+
+        String code = builder.toString();
+        if (tokenRepository.existsByToken(code)) {
+            return generateVerificationCode();
+        }
+        return code;
+    }
+
+    private void sendResetMail(String email, String verificationCode) {
         try {
             MimeMessage message = mailSender.createMimeMessage();
             MimeMessageHelper helper =
@@ -102,7 +143,7 @@ public class PasswordResetService {
                 helper.setFrom(fromAddress);
             }
 
-            helper.setSubject("비밀번호 재설정 안내");
+            helper.setSubject("비밀번호 재설정 인증 코드 안내");
 
             String html = """
                     <html>
@@ -121,7 +162,7 @@ public class PasswordResetService {
                               <tr>
                                 <td style="text-align: center;">
                                   <h2 style="margin: 0; color: #111827;">
-                                    비밀번호 재설정 안내
+                                    비밀번호 재설정 인증 코드
                                   </h2>
                                 </td>
                               </tr>
@@ -129,36 +170,32 @@ public class PasswordResetService {
                               <!-- 본문 -->
                               <tr>
                                 <td style="padding: 16px 0 24px; text-align: center; color: #374151; font-size: 15px; line-height: 1.6;">
-                                  아래 버튼을 클릭하면<br/>
-                                  새로운 비밀번호를 설정할 수 있습니다.
+                                  아래 인증 코드를 입력해 비밀번호 재설정을 계속 진행해주세요.
                                 </td>
                               </tr>
                     
                               <!-- 버튼 -->
                               <tr>
-                                <td align="center">
-                                  <a href="%s"
-                                     style="
-                                       display: inline-block;
-                                       padding: 14px 28px;
-                                       background-color: #2563eb;
-                                       color: #ffffff;
-                                       text-decoration: none;
-                                       border-radius: 10px;
-                                       font-size: 15px;
-                                       font-weight: 600;
-                                     ">
-                                    비밀번호 재설정
-                                  </a>
+                                <td style="text-align: center; padding: 8px 0 16px;">
+                                                                        <div style="
+                                                                            display: inline-block;
+                                                                            letter-spacing: 6px;
+                                                                            font-size: 30px;
+                                                                            font-weight: 700;
+                                                                            color: #2563eb;
+                                                                            background-color: #eff6ff;
+                                                                            padding: 14px 22px;
+                                                                            border-radius: 10px;
+                                                                        ">%s</div>
                                 </td>
                               </tr>
                     
                               <!-- 안내 문구 -->
                               <tr>
-                                <td style="padding-top: 28px; text-align: center; font-size: 12px; color: #6b7280; line-height: 1.6;">
-                                  본인이 요청하지 않았다면 이 메일을 무시해주세요.<br/>
-                                  이 링크는 <strong>%d분</strong> 동안만 유효합니다.
-                                </td>
+                                <td style="padding-top: 10px; text-align: center; font-size: 12px; color: #6b7280; line-height: 1.6;">
+                                                                       본인이 요청하지 않았다면 이 메일을 무시해주세요.<br/>
+                                                                       인증 코드는 <strong>%d분</strong> 동안만 유효합니다.
+                                                                     </td>
                               </tr>
                     
                             </table>
@@ -172,10 +209,10 @@ public class PasswordResetService {
                       </table>
                     </body>
                     </html>
-                    """.formatted(link, properties.getTokenTtlMinutes());
+                    """.formatted(verificationCode, properties.getTokenTtlMinutes());
 
 
-            helper.setText(html, true); // true = HTML 메일
+            helper.setText(html, true);
             mailSender.send(message);
 
         } catch (MessagingException e) {
