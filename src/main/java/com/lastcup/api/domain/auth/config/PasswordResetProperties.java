@@ -7,17 +7,8 @@ import org.springframework.stereotype.Component;
 @ConfigurationProperties(prefix = "app.password-reset")
 public class PasswordResetProperties {
 
-    private String baseUrl;
     private long tokenTtlMinutes = 30;
     private String fromAddress;
-
-    public String getBaseUrl() {
-        return baseUrl;
-    }
-
-    public void setBaseUrl(String baseUrl) {
-        this.baseUrl = baseUrl;
-    }
 
     public long getTokenTtlMinutes() {
         return tokenTtlMinutes;
