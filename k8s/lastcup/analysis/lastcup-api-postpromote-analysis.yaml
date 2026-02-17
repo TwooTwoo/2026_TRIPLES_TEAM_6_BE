@@ -1,0 +1,32 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  # pre-promote와 동일 항목을 검증하지만, 실제 사용자 트래픽을 받는 active 서비스를 체크ㅡ
+  # 실패시 Argo Rollouts가 자동으로 구버전으로 롤백한다.
+  name: lastcup-api-postpromote
+  namespace: lastcup
+spec:
+  metrics:
+    # 1. 승격 후 Active 서비스가 살아있는가?
+    - name: active-actuator-health
+      interval: 10s
+      count: 6
+      failureLimit: 2
+      provider:
+        web:
+          url: "http://lastcup-api-active.lastcup.svc.cluster.local/actuator/health"
+          timeoutSeconds: 5
+          jsonPath: "{$.status}"
+      successCondition: result == "UP"
+
+    # 2. 승격 후 API 스택이 정상 동작하는가?
+    - name: active-api-docs
+      interval: 10s
+      count: 6
+      failureLimit: 2
+      provider:
+        web:
+          # 클러스터 내부에서 접근하므로 서비스 이름과 네임스페이스로 URL 작성
+          url: "http://lastcup-api-active.lastcup.svc.cluster.local/api-docs"
+          timeoutSeconds: 5
+      successCondition: result.statusCode == 200
