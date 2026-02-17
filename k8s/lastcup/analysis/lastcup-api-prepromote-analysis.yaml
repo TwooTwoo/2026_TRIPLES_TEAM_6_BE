@@ -25,6 +25,6 @@ spec:
       provider:
         web:
           # 클러스터 내부에서 접근하므로 서비스 이름과 네임스페이스로 URL 작성
-          url: "http://lastcup-api-preview.lastcup.svc.cluster.local/v3/api-docs"
+          url: "http://lastcup-api-preview.lastcup.svc.cluster.local/api-docs"
           timeoutSeconds: 5
       successCondition: result.statusCode == 200
