@@ -1,10 +1,10 @@
-apiVersion: policy/v1
-kind: PodDisruptionBudget
+apiVersion: policy/v1     # 정책을 설정하는 policy API 그룹의 v1 버전 양식으로 작성된 매니페스트
+kind: PodDisruptionBudget # "이 파일로 PodDisruptionBudget을 만들겠다"
 metadata:
-  name: lastcup-api-pdb
-  namespace: lastcup
+  name: lastcup-api-pdb   # 이 PodDisruptionBudget의 이름은 lastcup-api-pdb입니다
+  namespace: lastcup      # 이 PodDisruptionBudget은 lastcup 네임스페이스에 속합니다
 spec:
-  minAvailable: 1 # "항상 최소 1개의 Pod은 살아있어야 한다"
-  selector:
-    matchLabels:
-      app: lastcup-api # "lastcup-api" 라벨이 붙은 Pod이 대상 즉, 이 라벨은 가진 Pod을 보호함
+  minAvailable: 1         # "항상 최소 1개의 Pod은 살아있어야 한다"
+  selector:               # "어떤 Pod을 보호할 것인가?"
+    matchLabels:          # -> label이 다음과 같은 경우
+      app: lastcup-api    # -> "lastcup-api" 라벨이 붙은 Pod을 보호하겠다.

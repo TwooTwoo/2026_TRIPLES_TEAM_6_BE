@@ -1,3 +1,7 @@
+# 해당 K8s 인프라가 어떤 리소스들을 사용할지 명시하는 파일
+# "이 파일들을 모아서 하나의 K8s 매니페스트로 묶겠다"
+# "이 주문서들을 모아서 하나의 주문서로 만들겠다"
+
 resources:
   - secrets/01-namespace.yaml
   - secrets/02-services.yaml
@@ -8,6 +12,20 @@ resources:
   - sealed-secrets/05-sealed-secret.yaml
   - 06-pdb.yaml
 
+# 해당 K8s 인프라가 어떤 검색키로 이미지를 검색할지, 그리고 어떤 태그로 교체할지 명시
 images:
+  # 위 yaml 파일들 중 어떤 이름의 이미지를 찾을 것인가
+  # 즉, 태그를 교체할 이미지를 찾는 검색 키
   - name: ghcr.io/gdgoc2026-triples-project/2026_triples_team_6_be
-    newTag: latest
+    newTag: latest # 그냥 처음에 넣어주는 의미없는 값 latest
+
+# 실제 동작 순서
+  # 1. 개발자가 코드를 push
+  # 2. GitHub Actions(CI)가 빌드 및 이미지 GHCR에 push
+  # 3. ArgoCD Image Updater가 감지 (얘는 GHCR을 주기적으로 감시하고 있음)
+  # 4. ArgoCD Image Updater가 kustomization.yaml의 image 항목을 업데이트 (newTag: latest ->  sha-a3b2c1f)
+      # 원래 위 방법을 채택해 수정커밋이 생겼으나, ArgoCD 내부 메모리만 업데이트하는 방식으로 변경하여 수정커밋 생성 방지
+  # 5. ArgoCD가 변경된 kustomization.yaml 감지
+  # 6. ArgoCD가 변경된 kustomization.yaml을 바탕으로 새로운 매니페스트 생성
+  # 7. Argo Rollouts가 새로운 매니페스트로 롤아웃 시작
+    # latest는 초기에 수동으로 넣어둔 값일 뿐, 실제 운영에선 Argo Image Updater가 태그로 덮어씌운다.
