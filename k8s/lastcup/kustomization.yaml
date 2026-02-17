@@ -4,6 +4,7 @@ resources:
   - secrets/03-rollout.yaml
   - secrets/04-ingress.yaml
   - analysis/lastcup-api-prepromote-analysis.yaml
+  - analysis/lastcup-api-postpromote-analysis.yaml
   - sealed-secrets/05-sealed-secret.yaml
   - 06-pdb.yaml
 
