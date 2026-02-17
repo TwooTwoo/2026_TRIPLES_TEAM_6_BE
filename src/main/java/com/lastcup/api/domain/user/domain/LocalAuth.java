@@ -59,4 +59,11 @@ public class LocalAuth extends BaseTimeEntity {
     public String getPasswordHash() {
         return passwordHash;
     }
+
+    public void updatePasswordHash(String passwordHash) {
+        if (passwordHash == null || passwordHash.isBlank()) {
+            throw new IllegalArgumentException("passwordHash is blank");
+        }
+        this.passwordHash = passwordHash;
+    }
 }

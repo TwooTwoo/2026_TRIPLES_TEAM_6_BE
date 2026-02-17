@@ -3,8 +3,6 @@ package com.lastcup.api.domain.option.domain;
 import com.lastcup.api.global.config.BaseTimeEntity;
 import jakarta.persistence.*;
 
-import java.math.BigDecimal;
-
 @Entity
 @Table(name = "options")
 public class Option extends BaseTimeEntity {
@@ -23,22 +21,12 @@ public class Option extends BaseTimeEntity {
     @Column(nullable = false, length = 20)
     private OptionCategory category;
 
-    @Column(nullable = false)
-    private int caffeineMg;
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private OptionSelectionType selectionType;
 
-    @Column(nullable = false)
-    private int sugarG;
-
-    private Integer calories;
-    private Integer sodiumMg;
-    private Integer proteinG;
-    private Integer fatG;
-
-    @Column(length = 30)
-    private String displayUnitName;
-
-    @Column(precision = 5, scale = 2)
-    private BigDecimal sugarCubeEquivalent;
+    @OneToOne(mappedBy = "option", fetch = FetchType.LAZY)
+    private OptionNutrition nutrition;
 
     protected Option() {
     }
@@ -47,57 +35,30 @@ public class Option extends BaseTimeEntity {
             Long brandId,
             String name,
             OptionCategory category,
-            int caffeineMg,
-            int sugarG,
-            Integer calories,
-            Integer sodiumMg,
-            Integer proteinG,
-            Integer fatG,
-            String displayUnitName,
-            BigDecimal sugarCubeEquivalent
+            OptionSelectionType selectionType
     ) {
         this.brandId = brandId;
         this.name = name;
         this.category = category;
-        this.caffeineMg = caffeineMg;
-        this.sugarG = sugarG;
-        this.calories = calories;
-        this.sodiumMg = sodiumMg;
-        this.proteinG = proteinG;
-        this.fatG = fatG;
-        this.displayUnitName = displayUnitName;
-        this.sugarCubeEquivalent = sugarCubeEquivalent;
+        this.selectionType = selectionType;
     }
 
     public static Option create(
             Long brandId,
             String name,
             OptionCategory category,
-            int caffeineMg,
-            int sugarG,
-            Integer calories,
-            Integer sodiumMg,
-            Integer proteinG,
-            Integer fatG,
-            String displayUnitName,
-            BigDecimal sugarCubeEquivalent
+            OptionSelectionType selectionType
     ) {
         validateBrandId(brandId);
         validateName(name);
         validateCategory(category);
+        validateSelectionType(selectionType);
 
         return new Option(
                 brandId,
                 name,
                 category,
-                caffeineMg,
-                sugarG,
-                calories,
-                sodiumMg,
-                proteinG,
-                fatG,
-                displayUnitName,
-                sugarCubeEquivalent
+                selectionType
         );
     }
 
@@ -119,27 +80,33 @@ public class Option extends BaseTimeEntity {
         }
     }
 
-    public Long getId() {return id;}
+    private static void validateSelectionType(OptionSelectionType selectionType) {
+        if (selectionType == null) {
+            throw new IllegalArgumentException("selectionType is null");
+        }
+    }
 
-    public Long getBrandId() {return brandId;}
+    public Long getId() {
+        return id;
+    }
 
-    public String getName() {return name;}
+    public Long getBrandId() {
+        return brandId;
+    }
 
-    public OptionCategory getCategory() {return category;}
+    public String getName() {
+        return name;
+    }
 
-    public int getCaffeineMg() {return caffeineMg;}
+    public OptionCategory getCategory() {
+        return category;
+    }
 
-    public int getSugarG() {return sugarG;}
+    public OptionSelectionType getSelectionType() {
+        return selectionType;
+    }
 
-    public Integer getCalories() {return calories;}
-
-    public Integer getSodiumMg() {return sodiumMg;}
-
-    public Integer getProteinG() {return proteinG;}
-
-    public Integer getFatG() {return fatG;}
-
-    public String getDisplayUnitName() {return displayUnitName;}
-
-    public BigDecimal getSugarCubeEquivalent() {return sugarCubeEquivalent;}
+    public OptionNutrition getNutrition() {
+        return nutrition;
+    }
 }

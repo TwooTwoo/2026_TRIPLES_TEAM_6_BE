@@ -10,4 +10,8 @@ public interface SocialAuthRepository extends JpaRepository<SocialAuth, Long> {
     Optional<SocialAuth> findByProviderAndProviderUserKey(SocialProvider provider, String providerUserKey);
 
     boolean existsByUserId(Long userId);
+
+    Optional<SocialAuth> findByUserId(Long userId);
+
+    void deleteByUserId(Long userId);
 }

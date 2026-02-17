@@ -1,19 +1,21 @@
 package com.lastcup.api.domain.goal.service;
 
+import static com.lastcup.api.global.config.AppTimeZone.KST;
+
 import com.lastcup.api.domain.goal.domain.UserGoal;
 import com.lastcup.api.domain.goal.repository.UserGoalRepository;
 import java.time.LocalDate;
+import java.util.Optional;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import java.util.Optional;
 
 @Service
 @Transactional
 public class UserGoalService {
 
-    private static final int DEFAULT_DAILY_CAFFEINE_TARGET = 400;
-    private static final int DEFAULT_DAILY_SUGAR_TARGET = 25;
+    public static final int DEFAULT_DAILY_CAFFEINE_TARGET = 400;
+    public static final int DEFAULT_DAILY_SUGAR_TARGET = 25;
 
     private final UserGoalRepository userGoalRepository;
 
@@ -23,23 +25,25 @@ public class UserGoalService {
 
     @Transactional(readOnly = true)
     public UserGoal findCurrent(Long userId) {
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(KST);
         return findFirstActiveByDate(userId, today)
                 .orElseThrow(() -> new IllegalArgumentException("user goal not found"));
     }
 
     public UserGoal findByDate(Long userId, LocalDate date) {
-        LocalDate targetDate = date != null ? date : LocalDate.now();
-        if (targetDate.isEqual(LocalDate.now())) {
-            return findFirstActiveByDate(userId, targetDate)
-                    .orElseGet(() -> createDefault(userId, targetDate));
-        }
+        LocalDate targetDate = date != null ? date : LocalDate.now(KST);
         return findFirstActiveByDate(userId, targetDate)
-                .orElseThrow(() -> new IllegalArgumentException("user goal not found"));
+                .orElseGet(() -> createDefault(userId, targetDate));
     }
 
     public UserGoal findOrCreateCurrent(Long userId) {
-        return findByDate(userId, LocalDate.now());
+        return findByDate(userId, LocalDate.now(KST));
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<UserGoal> findOptionalByDate(Long userId, LocalDate date) {
+        LocalDate targetDate = date != null ? date : LocalDate.now(KST);
+        return findFirstActiveByDate(userId, targetDate);
     }
 
     public UserGoal updateGoal(
@@ -100,6 +104,6 @@ public class UserGoalService {
     }
 
     private LocalDate resolveStartDate(LocalDate startDate) {
-        return startDate != null ? startDate : LocalDate.now();
+        return startDate != null ? startDate : LocalDate.now(KST);
     }
 }

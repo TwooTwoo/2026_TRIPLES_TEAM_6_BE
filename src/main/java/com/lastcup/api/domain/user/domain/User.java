@@ -14,6 +14,9 @@ public class User extends BaseTimeEntity {
     @Column(nullable = false, length = 50)
     private String nickname;
 
+    @Column(unique = true, length = 100)
+    private String email;
+
     @Column(length = 500)
     private String profileImageUrl;
 
@@ -24,15 +27,16 @@ public class User extends BaseTimeEntity {
     protected User() {
     }
 
-    private User(String nickname, String profileImageUrl) {
+    private User(String nickname, String email, String profileImageUrl) {
         this.nickname = nickname;
+        this.email = email;
         this.profileImageUrl = profileImageUrl;
         this.status = UserStatus.ACTIVE;
     }
 
-    public static User create(String nickname, String profileImageUrl) {
+    public static User create(String nickname, String email, String profileImageUrl) {
         validateNickname(nickname);
-        return new User(nickname, profileImageUrl);
+        return new User(nickname, email, profileImageUrl);
     }
 
     public void updateProfileImage(String profileImageUrl) {
@@ -42,6 +46,19 @@ public class User extends BaseTimeEntity {
     public void updateNickname(String nickname) {
         validateNickname(nickname);
         this.nickname = nickname;
+    }
+
+    /**
+     * 이메일이 아직 없는 경우에만 업데이트한다.
+     * Apple 로그인은 최초 1회만 이메일을 제공하므로,
+     * 첫 가입 시 누락됐다가 이후 클라이언트가 전달하면 보충한다.
+     */
+    public boolean updateEmailIfAbsent(String email) {
+        if (this.email != null || email == null || email.isBlank()) {
+            return false;
+        }
+        this.email = email;
+        return true;
     }
 
     public void delete() {
@@ -54,12 +71,23 @@ public class User extends BaseTimeEntity {
         }
     }
 
+    public void clearEmail() {
+        this.email = null;
+    }
+
+    // email은 소셜 로그인 사용자의 경우 null일 수 있음 (카카오 등)
+    // 로컬 회원가입은 SignupRequest DTO에서 @NotBlank @Email로 검증
+
     public Long getId() {
         return id;
     }
 
     public String getNickname() {
         return nickname;
+    }
+
+    public String getEmail() {
+        return email;
     }
 
     public String getProfileImageUrl() {
